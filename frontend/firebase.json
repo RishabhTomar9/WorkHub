@@ -3,11 +3,7 @@
     "dataconnect": {
       "dataDir": "dataconnect/.dataconnect/pgliteData"
     }
-  },
-  "dataconnect": {
-    "source": "dataconnect"
-  },
-  "firestore": {
+  },"firestore": {
     "database": "(default)",
     "location": "asia-south1",
     "rules": "firestore.rules",
