@@ -12,7 +12,8 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaExclamationTriangle,
-  FaSpinner
+  FaSpinner,
+  FaSearch
 } from "react-icons/fa";
 import { siteService, workerService, attendanceService, paymentService } from "../api/attendanceService";
 
@@ -25,6 +26,7 @@ const AttendanceManager = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [workerPayments, setWorkerPayments] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
   
   // UI States
   const [showAddWorker, setShowAddWorker] = useState(false);
@@ -101,6 +103,11 @@ const AttendanceManager = () => {
   };
 
   const markAttendance = async (workerId, status) => {
+    if (!selectedSite) {
+      setError('Please select a site first');
+      return;
+    }
+    
     try {
       await attendanceService.markAttendance({
         workerId,
@@ -116,6 +123,22 @@ const AttendanceManager = () => {
   };
 
   const addWorker = async () => {
+    if (!selectedSite) {
+      setError('Please select a site first');
+      return;
+    }
+    
+    if (!newWorker.name.trim()) {
+      setError('Please enter worker name');
+      return;
+    }
+    
+    // Validate Indian mobile number
+    if (newWorker.phone && !/^[6-9]\d{9}$/.test(newWorker.phone)) {
+      setError('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
+      return;
+    }
+    
     try {
       await workerService.addWorker({
         ...newWorker,
@@ -132,6 +155,16 @@ const AttendanceManager = () => {
   };
 
   const addPayment = async (workerId) => {
+    if (!selectedSite) {
+      setError('Please select a site first');
+      return;
+    }
+    
+    if (!paymentData.amount || Number(paymentData.amount) <= 0) {
+      setError('Please enter a valid payment amount');
+      return;
+    }
+    
     try {
       await paymentService.addPayment({
         workerId,
@@ -202,6 +235,26 @@ const AttendanceManager = () => {
     };
   };
 
+  // Filter workers based on search term
+  const filteredWorkers = workers.filter(worker => {
+    const matchesName = worker.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = worker.role.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPhone = worker.phone && worker.phone.includes(searchTerm);
+    
+    // Debug logging
+    if (searchTerm) {
+      console.log('Search term:', searchTerm);
+      console.log('Worker:', worker.name, 'Name match:', matchesName, 'Role match:', matchesRole, 'Phone match:', matchesPhone);
+    }
+    
+    return matchesName || matchesRole || matchesPhone;
+  });
+
+  // Debug logging for search state
+  console.log('Search term state:', searchTerm);
+  console.log('Total workers:', workers.length);
+  console.log('Filtered workers:', filteredWorkers.length);
+
   if (loading && sites.length === 0) {
   return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900">
@@ -226,7 +279,7 @@ const AttendanceManager = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-5xl sm:text-6xl font-bold text-white mb-3">WorkHub Attendance</h1>
+          <h1 className="text-4xl font-bold text-white mb-3">WorkHub Attendance</h1>
           <p className="text-blue-200 text-lg sm:text-xl">Manage worker attendance and payments</p>
         </motion.div>
 
@@ -237,9 +290,9 @@ const AttendanceManager = () => {
            transition={{ delay: 0.1 }}
            className="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 mb-6 border border-white/20"
          >
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         {/* Site Selection */}
-            <div className="sm:col-span-2 lg:col-span-1">
+            <div>
               <label className="block text-white font-medium mb-2 text-base sm:text-lg">Select Site</label>
               <select
                 value={selectedSite?._id || ''}
@@ -253,6 +306,39 @@ const AttendanceManager = () => {
                 ))}
               </select>
       </div>
+
+            {/* Search Bar */}
+            <div>
+              <label className="block text-white font-medium mb-2 text-base sm:text-lg">
+                Search Workers
+                {searchTerm && (
+                  <span className="text-sm text-blue-300 ml-2">
+                    ({filteredWorkers.length} of {workers.length})
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-300 text-sm sm:text-base" />
+                <input
+                  type="text"
+                  placeholder="Search by name, role, or phone..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    console.log('Search input changed:', e.target.value);
+                    setSearchTerm(e.target.value);
+                  }}
+                  className="w-full pl-10 pr-10 p-4 rounded-lg bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px]"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Date Selection */}
             <div>
@@ -271,10 +357,14 @@ const AttendanceManager = () => {
             {/* Add Worker Button */}
             <div className="sm:col-span-2 lg:col-span-1 flex items-end">
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowAddWorker(true)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[52px]"
+                whileHover={selectedSite ? { scale: 1.05 } : {}}
+                onClick={() => selectedSite && setShowAddWorker(true)}
+                disabled={!selectedSite}
+                className={`w-full px-4 py-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[52px] ${
+                  selectedSite 
+                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' 
+                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 <FaUserPlus className="text-sm sm:text-base" />
                 <span className="hidden sm:inline">Add Worker</span>
@@ -305,8 +395,9 @@ const AttendanceManager = () => {
         </AnimatePresence>
 
                  {/* Workers Grid */}
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {workers.map((worker, index) => {
+         {selectedSite ? (
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {filteredWorkers.map((worker, index) => {
             const attendance = getWorkerAttendance(worker._id);
             const stats = calculateWorkerStats(worker);
             return (
@@ -362,11 +453,10 @@ const AttendanceManager = () => {
               </div>
               </div>
 
-                                {/* Attendance Buttons */}
+              {/* Attendance Buttons */}
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => markAttendance(worker._id, 'present')}
                     className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-3 sm:py-3 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-[48px]"
                   >
@@ -374,7 +464,6 @@ const AttendanceManager = () => {
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => markAttendance(worker._id, 'halfday')}
                     className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 sm:px-4 py-3 sm:py-3 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-[48px]"
                   >
@@ -382,7 +471,6 @@ const AttendanceManager = () => {
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => markAttendance(worker._id, 'absent')}
                     className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-3 sm:py-3 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-[48px]"
                   >
@@ -396,7 +484,6 @@ const AttendanceManager = () => {
                     <span className="text-white font-medium text-base sm:text-lg">Payments</span>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={() => setShowAddPayment(worker._id)}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 sm:py-2 rounded-lg text-sm sm:text-base flex items-center gap-1 transition-colors min-h-[36px] sm:min-h-[40px]"
                     >
@@ -440,7 +527,6 @@ const AttendanceManager = () => {
                         <div className="flex gap-2">
                           <motion.button
                             whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
                             onClick={() => addPayment(worker._id)}
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-3 sm:py-3 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-[48px]"
                           >
@@ -448,7 +534,6 @@ const AttendanceManager = () => {
                           </motion.button>
                           <motion.button
                             whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
                             onClick={() => setShowAddPayment(null)}
                             className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-3 sm:py-3 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] sm:min-h-[48px]"
                           >
@@ -462,7 +547,31 @@ const AttendanceManager = () => {
             </motion.div>
           );
         })}
-        </div>
+           </div>
+         ) : (
+           <motion.div
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             className="text-center py-12"
+           >
+             <FaUserPlus className="text-6xl text-gray-400 mx-auto mb-4" />
+             <h3 className="text-xl text-white mb-2">No Site Selected</h3>
+             <p className="text-gray-400">Please select a site to view and manage workers</p>
+           </motion.div>
+         )}
+
+         {/* No Workers Found Message */}
+         {selectedSite && filteredWorkers.length === 0 && workers.length > 0 && (
+           <motion.div
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             className="text-center py-12"
+           >
+             <FaSearch className="text-6xl text-gray-400 mx-auto mb-4" />
+             <h3 className="text-xl text-white mb-2">No Workers Found</h3>
+             <p className="text-gray-400">No workers match your search criteria</p>
+           </motion.div>
+         )}
 
         {/* Add Worker Modal */}
         <AnimatePresence>
@@ -504,9 +613,16 @@ const AttendanceManager = () => {
                   />
                   <input
                     type="tel"
-                    placeholder="Phone Number"
+                    placeholder="Phone Number (10 digits)"
                     value={newWorker.phone}
-                    onChange={(e) => setNewWorker({...newWorker, phone: e.target.value})}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                      if (value.length <= 10) {
+                        setNewWorker({...newWorker, phone: value});
+                      }
+                    }}
+                    maxLength={10}
+                    pattern="[6-9][0-9]{9}"
                     className="w-full p-4 rounded-lg bg-white/10 border border-white/30 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 text-base"
                   />
                   <input
@@ -520,7 +636,6 @@ const AttendanceManager = () => {
                     <div className="flex gap-3">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={addWorker}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors text-base font-medium"
                     >
@@ -528,7 +643,6 @@ const AttendanceManager = () => {
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={() => setShowAddWorker(false)}
                       className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-lg transition-colors text-base font-medium"
                     >

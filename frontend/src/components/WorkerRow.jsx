@@ -39,9 +39,16 @@ export default function WorkerRow({ worker, onUpdate, onRemove, onOpen, stats })
             <input
               type="tel"
               value={form.phone || ''}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                if (value.length <= 10) {
+                  setForm({ ...form, phone: value });
+                }
+              }}
+              maxLength={10}
+              pattern="[6-9][0-9]{9}"
               className="bg-white/20 border border-white/30 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-400"
-              placeholder="Phone Number"
+              placeholder="Phone Number (10 digits)"
             />
           </div>
           <input

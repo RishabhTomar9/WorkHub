@@ -179,6 +179,13 @@ export default function SiteView() {
   // Add worker
   async function handleAddWorker(e) {
     e.preventDefault();
+    
+    // Validate Indian mobile number
+    if (newWorker.phone && !/^[6-9]\d{9}$/.test(newWorker.phone)) {
+      toast.error("❌ Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9");
+      return;
+    }
+    
     try {
       const auth = getAuth();
       const user = auth.currentUser;
@@ -426,11 +433,16 @@ export default function SiteView() {
                 <input
                   type="tel"
                   maxLength={10}
-                  pattern="[6-9]*"
+                  pattern="[6-9][0-9]{9}"
                   className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 text-base"
-                  placeholder="Phone Number"
+                  placeholder="Phone Number (10 digits)"
                   value={newWorker.phone}
-                  onChange={(e) => setNewWorker({ ...newWorker, phone: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                    if (value.length <= 10) {
+                      setNewWorker({ ...newWorker, phone: value });
+                    }
+                  }}
                 />
                 <input
                   type="text"

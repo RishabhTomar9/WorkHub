@@ -46,6 +46,18 @@ export default function Login() {
         className="w-full max-w-md backdrop-blur-xl bg-transparent border border-white/40 rounded-3xl shadow-2xl p-10 text-center"
       >
         {/* Logo / Branding */}
+        <div className="flex flex-col items-center">
+        {/* Logo */}
+        <motion.img
+          src="/vite.svg"
+          alt="WorkHub Logo"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-24 h-24 sm:w-28 sm:h-28 mb-4 rounded-full border-[6px] border-white/80 shadow-lg shadow-blue-500/20 hover:scale-105 transition-transform duration-300"
+          />
+
+        {/* Title */}
         <motion.h1
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
@@ -54,9 +66,12 @@ export default function Login() {
         >
           WorkHub
         </motion.h1>
+
+        {/* Subtitle */}
         <p className="text-gray-300 mb-8 text-sm sm:text-base">
           Manage your workforce with ease
         </p>
+      </div>
 
         {/* Error Message */}
         {error && (

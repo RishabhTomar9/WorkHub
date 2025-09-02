@@ -4,7 +4,8 @@ import { auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaBuilding, FaUsers, FaMoneyBillWave, FaCalendarAlt, FaPlus, FaEye, FaTrash, FaArchive, FaUndo } from "react-icons/fa";
+import { FaBuilding, FaUsers, FaMoneyBillWave, FaCalendarAlt, FaEye, FaTrash, FaArchive, FaUndo, FaSearch } from "react-icons/fa";
+import { IoMdRefresh } from "react-icons/io";
 
 export default function Dashboard() {
   const [sites, setSites] = useState([]);
@@ -15,7 +16,27 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [siteStats, setSiteStats] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+
+  // Filter sites based on search term
+  const filteredSites = (showArchived ? archivedSites : sites).filter(site => {
+    const matchesName = site.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocation = site.location && site.location.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Debug logging
+    if (searchTerm) {
+      console.log('Search term:', searchTerm);
+      console.log('Site:', site.name, 'Name match:', matchesName, 'Location match:', matchesLocation);
+    }
+    
+    return matchesName || matchesLocation;
+  });
+
+  // Debug logging for search state
+  console.log('Search term state:', searchTerm);
+  console.log('Total sites:', (showArchived ? archivedSites : sites).length);
+  console.log('Filtered sites:', filteredSites.length);
 
   useEffect(() => {
     fetchSites();
@@ -174,7 +195,7 @@ export default function Dashboard() {
       >
         <div>
           <h1 className="text-4xl sm:text-5xl font-bold text-white drop-shadow-md">
-            Welcome,
+            Welcome,{" "}
             <span className="text-indigo-400 font-extrabold">
               {user?.displayName || user?.email || "User"}
             </span>
@@ -192,36 +213,32 @@ export default function Dashboard() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8"
       >
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        
           onClick={() => navigate("/attendance")}
           className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
         >
-          <FaCalendarAlt className="text-lg sm:text-xl" />
+          <FaCalendarAlt className="text-2xl" />
           <span className="font-semibold text-base sm:text-lg">Manage Attendance</span>
         </motion.button>
         
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+         
           onClick={() => navigate("/payouts")}
           className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
         >
-          <FaMoneyBillWave className="text-lg sm:text-xl" />
+          <FaMoneyBillWave className="text-2xl" />
           <span className="font-semibold text-base sm:text-lg">View Payouts</span>
         </motion.button>
         
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+         
           onClick={fetchSites}
           className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px] sm:col-span-2 lg:col-span-1"
         >
-          <FaPlus className="text-lg sm:text-xl" />
+          <IoMdRefresh  className="text-3xl" />
           <span className="font-semibold text-base sm:text-lg">Refresh Data</span>
         </motion.button>
       </motion.div>
@@ -273,6 +290,41 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              Search Sites
+              {searchTerm && (
+                <span className="text-indigo-600 ml-2">
+                  ({filteredSites.length} of {(showArchived ? archivedSites : sites).length})
+                </span>
+              )}
+            </label>
+          </div>
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
+            <input
+              type="text"
+              placeholder="Search sites by name or location..."
+              value={searchTerm}
+              onChange={(e) => {
+                console.log('Search input changed:', e.target.value);
+                setSearchTerm(e.target.value);
+              }}
+              className="w-full pl-10 pr-10 py-3 border rounded-lg text-base outline-none focus:ring-2 focus:ring-indigo-400 transition"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
         {!showArchived && (
           <div className="flex flex-col md:flex-row gap-3">
             <input
@@ -289,7 +341,6 @@ export default function Dashboard() {
             />
             <motion.button
               whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg shadow-md transition text-base font-medium"
               onClick={addSite}
             >
@@ -313,16 +364,23 @@ export default function Dashboard() {
         )}
 
         {!loading &&
-          (showArchived ? archivedSites : sites).length === 0 && (
+          filteredSites.length === 0 && (
             <div className="col-span-full text-center text-gray-400 italic py-6">
-              {showArchived
-                ? "No archived sites."
-                : "No sites found. Create one above!"}
+              {searchTerm ? (
+                <div>
+                  <FaSearch className="text-4xl mx-auto mb-2 text-gray-300" />
+                  <p>No sites found matching "{searchTerm}"</p>
+                </div>
+              ) : showArchived ? (
+                "No archived sites."
+              ) : (
+                "No sites found. Create one above!"
+              )}
             </div>
           )}
 
         <AnimatePresence>
-          {(showArchived ? archivedSites : sites).map((s) => (
+          {filteredSites.map((s) => (
             <motion.div
               key={s._id}
               variants={cardVariants}
@@ -330,7 +388,6 @@ export default function Dashboard() {
                 scale: 1.03,
                 boxShadow: "0px 8px 30px rgba(99,102,241,0.25)",
               }}
-              whileTap={{ scale: 0.97 }}
               className="site-card bg-white rounded-xl shadow-md p-4 sm:p-5 flex flex-col gap-3 border border-gray-200 transition min-h-[200px] sm:min-h-[220px]"
               layout
             >
@@ -387,7 +444,6 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row gap-2 justify-end">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => restoreSite(s._id)}
                     className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
                   >
@@ -410,7 +466,6 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row gap-2 justify-end">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => navigate(`/site/${s._id}`)}
                     className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
                   >
@@ -420,7 +475,6 @@ export default function Dashboard() {
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => navigate('/payouts')}
                     className="px-4 sm:px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
                   >
