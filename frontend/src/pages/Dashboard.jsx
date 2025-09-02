@@ -1,56 +1,439 @@
-import React, { Suspense } from 'react'
-import { motion } from 'framer-motion'
-import KPICard from '../components/dashboard/KPICard'
-import SmallLineChart from '../components/dashboard/SmallLineChart'
-import RecentPayouts from '../components/dashboard/RecentPayouts'
-import useDashboardData from '../hooks/useDashboardData'
-
+import React, { useEffect, useState } from "react";
+import api from "../api/api";
+import { auth } from "../firebase";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { FaBuilding, FaUsers, FaMoneyBillWave, FaCalendarAlt, FaPlus, FaEye, FaTrash, FaArchive, FaUndo } from "react-icons/fa";
 
 export default function Dashboard() {
-const { data, loading, error, refresh } = useDashboardData()
+  const [sites, setSites] = useState([]);
+  const [archivedSites, setArchivedSites] = useState([]);
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [siteStats, setSiteStats] = useState({});
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    fetchSites();
+    const unsub = auth.onAuthStateChanged((u) => {
+      if (u) setUser(u);
+    });
+    return () => unsub();
+  }, []);
 
-return (
-<div className="space-y-6">
-<div className="flex items-center justify-between">
-<h1 className="text-2xl sm:text-3xl font-semibold">Dashboard</h1>
-<div className="flex items-center gap-3">
-<button
-className="px-3 py-1 rounded border hover:bg-gray-50"
-onClick={refresh}
-aria-label="Refresh dashboard"
->
-Refresh
-</button>
-</div>
-</div>
+  async function fetchSites() {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/sites");
+      setSites(data);
+      await fetchSiteStats(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch sites");
+    }
+    setLoading(false);
+  }
 
+  async function fetchSiteStats(sitesData) {
+    try {
+      const stats = {};
+      for (const site of sitesData) {
+        try {
+          // Get workers for this site
+          const workersRes = await api.get(`/workers/site/${site._id}`);
+          const workers = workersRes.data;
+          
+          // Get attendance for last 30 days
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const today = new Date().toISOString().slice(0, 10);
+          
+          let totalEarned = 0;
+          let totalPaid = 0;
+          
+          for (const worker of workers) {
+            // Calculate earned amount based on attendance
+            const attendanceRes = await api.get(`/attendance/site/${site._id}?date=${today}`);
+            const attendance = attendanceRes.data.find(a => a.worker._id === worker._id);
+            
+            if (attendance) {
+              const earned = attendance.status === 'present' ? worker.wageRate : 
+                           attendance.status === 'halfday' ? worker.wageRate / 2 : 0;
+              totalEarned += earned;
+            }
+            
+            // Get payments for this worker
+            try {
+              const paymentsRes = await api.get(`/payments/worker/${worker._id}`);
+              const payments = paymentsRes.data;
+              totalPaid += payments.reduce((sum, p) => sum + p.amount, 0);
+            } catch (err) {
+              // No payments yet
+            }
+          }
+          
+          stats[site._id] = {
+            totalWorkers: workers.length,
+            totalEarned,
+            totalPaid,
+            remainingAmount: totalEarned - totalPaid
+          };
+        } catch (err) {
+          console.error(`Error fetching stats for site ${site._id}:`, err);
+          stats[site._id] = {
+            totalWorkers: 0,
+            totalEarned: 0,
+            totalPaid: 0,
+            remainingAmount: 0
+          };
+        }
+      }
+      setSiteStats(stats);
+    } catch (err) {
+      console.error('Error fetching site stats:', err);
+    }
+  }
 
-<Suspense fallback={<div className="p-6 bg-white rounded shadow">Loading dashboard...</div>}>
-<section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-<KPICard title="Workers Today" value={loading ? '—' : data?.workersToday ?? 0} />
-<KPICard title="Absent Today" value={loading ? '—' : data?.absentToday ?? 0} />
-<KPICard title="Total Payout (Today)" value={loading ? '—' : `₹${data?.payoutToday ?? 0}`} />
-<KPICard title="Active Sites" value={loading ? '—' : data?.sitesActive ?? 0} />
-</section>
+  async function fetchArchivedSites() {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/sites/archived");
+      setArchivedSites(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch archived sites");
+    }
+    setLoading(false);
+  }
 
+  async function addSite() {
+    if (!name.trim()) return toast.warn("Site name required");
+    try {
+      const res = await api.post("/sites", { name, location });
+      setSites([res.data, ...sites]);
+      setName("");
+      setLocation("");
+      toast.success("Site created successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create site");
+    }
+  }
 
-<section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-<div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow">
-<h2 className="text-lg font-medium mb-3">Payouts — Last 7 days</h2>
-<SmallLineChart data={data?.payoutsLast7 ?? []} />
-</div>
+  async function restoreSite(id) {
+    try {
+      await api.patch(`/sites/${id}/restore`);
+      const restored = archivedSites.find((s) => s._id === id);
+      setArchivedSites(archivedSites.filter((s) => s._id !== id));
+      setSites([restored, ...sites]);
+      toast.success("Site restored");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to restore site");
+    }
+  }
 
+  async function deleteSite(id) {
+    try {
+      await api.delete(`/sites/${id}`);
+      setArchivedSites(archivedSites.filter((s) => s._id !== id));
+      toast.success("Site permanently deleted");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete site");
+    }
+  }
 
-<div className="bg-white rounded-2xl p-4 shadow">
-<h2 className="text-lg font-medium mb-3">Recent Payouts</h2>
-<RecentPayouts items={data?.recentPayouts ?? []} />
-</div>
-</section>
-</Suspense>
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.12 } },
+  };
+  const cardVariants = {
+    hidden: { y: 30, opacity: 0 },
+    show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 70 } },
+  };
 
+  return (
+    <motion.div
+      className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black px-4 py-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      {/* Header */}
+      <motion.div
+        initial={{ y: -40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="mb-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+      >
+        <div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-white drop-shadow-md">
+            Welcome,
+            <span className="text-indigo-400 font-extrabold">
+              {user?.displayName || user?.email || "User"}
+            </span>
+          </h1>
+          <p className="text-gray-300 mt-3 text-lg sm:text-xl">
+            Manage your{" "}
+            <span className="font-semibold text-indigo-300">sites</span>,{" "}
+            <span className="font-semibold text-indigo-300">staff</span>, and{" "}
+            <span className="font-semibold text-indigo-300">attendance</span>
+          </p>
+        </div>
+      </motion.div>
 
-{error && <div className="text-red-600">Failed to load dashboard: {String(error)}</div>}
-</div>
-)
+      {/* Quick Actions */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8"
+      >
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate("/attendance")}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
+        >
+          <FaCalendarAlt className="text-lg sm:text-xl" />
+          <span className="font-semibold text-base sm:text-lg">Manage Attendance</span>
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate("/payouts")}
+          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
+        >
+          <FaMoneyBillWave className="text-lg sm:text-xl" />
+          <span className="font-semibold text-base sm:text-lg">View Payouts</span>
+        </motion.button>
+        
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={fetchSites}
+          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px] sm:col-span-2 lg:col-span-1"
+        >
+          <FaPlus className="text-lg sm:text-xl" />
+          <span className="font-semibold text-base sm:text-lg">Refresh Data</span>
+        </motion.button>
+      </motion.div>
+
+      {/* Create Site + Toggle */}
+      <motion.div
+        className="bg-white/90 shadow-md rounded-xl p-5 mb-6 border border-gray-200"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="flex flex-col md:flex-row justify-between items-center mb-4">
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+            {showArchived ? "Archived Sites" : "Create New Site"}
+          </h2>
+
+          {/* Toggle Switch */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-base font-medium ${
+                !showArchived ? "text-indigo-600" : "text-gray-500"
+              }`}
+            >
+              Active Sites
+            </span>
+            <button
+              onClick={() => {
+                const newVal = !showArchived;
+                setShowArchived(newVal);
+                if (newVal) fetchArchivedSites();
+              }}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition ${
+                showArchived ? "bg-indigo-600" : "bg-gray-300"
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition ${
+                  showArchived ? "translate-x-6" : "translate-x-0"
+                }`}
+              ></div>
+            </button>
+            <span
+              className={`text-base font-medium ${
+                showArchived ? "text-indigo-600" : "text-gray-500"
+              }`}
+            >
+              Archived Sites
+            </span>
+          </div>
+        </div>
+
+        {!showArchived && (
+          <div className="flex flex-col md:flex-row gap-3">
+            <input
+              className="flex-1 border rounded-lg px-4 py-3 text-base outline-none focus:ring-2 focus:ring-indigo-400 transition"
+              placeholder="Site name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className="flex-1 border rounded-lg px-4 py-3 text-base outline-none focus:ring-2 focus:ring-indigo-400 transition"
+              placeholder="Location (optional)"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg shadow-md transition text-base font-medium"
+              onClick={addSite}
+            >
+              Add Site
+            </motion.button>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Sites List */}
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        {loading && (
+          <div className="col-span-full flex justify-center items-center py-6">
+            <div className="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+
+        {!loading &&
+          (showArchived ? archivedSites : sites).length === 0 && (
+            <div className="col-span-full text-center text-gray-400 italic py-6">
+              {showArchived
+                ? "No archived sites."
+                : "No sites found. Create one above!"}
+            </div>
+          )}
+
+        <AnimatePresence>
+          {(showArchived ? archivedSites : sites).map((s) => (
+            <motion.div
+              key={s._id}
+              variants={cardVariants}
+              whileHover={{
+                scale: 1.03,
+                boxShadow: "0px 8px 30px rgba(99,102,241,0.25)",
+              }}
+              whileTap={{ scale: 0.97 }}
+              className="site-card bg-white rounded-xl shadow-md p-4 sm:p-5 flex flex-col gap-3 border border-gray-200 transition min-h-[200px] sm:min-h-[220px]"
+              layout
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <FaBuilding className="text-blue-600 text-sm sm:text-base" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-gray-900 text-lg sm:text-xl truncate">
+                      {s.name}
+                    </div>
+                    <div className="text-gray-500 text-sm sm:text-base truncate">
+                      {s.location || "No location"}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`px-3 sm:px-4 py-2 rounded-full text-sm sm:text-base font-medium flex-shrink-0 ${
+                    showArchived
+                      ? "bg-gray-200 text-gray-700"
+                      : "bg-green-100 text-green-700"
+                  }`}
+                >
+                  {showArchived ? "Archived" : "Active"}
+                </div>
+              </div>
+
+              {/* Site Stats */}
+              {!showArchived && siteStats[s._id] && (
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
+                      <FaUsers className="text-xs sm:text-sm" />
+                      <span className="text-xs font-medium">Workers</span>
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900">
+                      {siteStats[s._id].totalWorkers}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-green-600 mb-1">
+                      <FaMoneyBillWave className="text-xs sm:text-sm" />
+                      <span className="text-xs font-medium">Remaining</span>
+                    </div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900">
+                      ₹{siteStats[s._id].remainingAmount.toFixed(0)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showArchived ? (
+                <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => restoreSite(s._id)}
+                    className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                  >
+                    <FaUndo className="text-sm" />
+                    <span className="hidden sm:inline">Restore</span>
+                    <span className="sm:hidden">Restore</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => deleteSite(s._id)}
+                    className="px-4 sm:px-5 py-3 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                  >
+                    <FaTrash className="text-sm" />
+                    <span className="hidden sm:inline">Delete</span>
+                    <span className="sm:hidden">Delete</span>
+                  </motion.button>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate(`/site/${s._id}`)}
+                    className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                  >
+                    <FaEye className="text-sm" />
+                    <span className="hidden sm:inline">Open Site</span>
+                    <span className="sm:hidden">Open</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/payouts')}
+                    className="px-4 sm:px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                  >
+                    <FaMoneyBillWave className="text-sm" />
+                    <span className="hidden sm:inline">Payouts</span>
+                    <span className="sm:hidden">Pay</span>
+                  </motion.button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
 }
