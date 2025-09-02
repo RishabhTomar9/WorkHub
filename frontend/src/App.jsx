@@ -3,8 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import { setAuthToken } from "./api/api";
-
-import Navbar from "./components/Navbar";
+import Navbar from "./components/NavBar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import SiteView from "./pages/SiteView";
