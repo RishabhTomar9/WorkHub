@@ -2,6 +2,7 @@ import express from 'express';
 import Attendance from '../models/Attendance.js';
 import Worker from '../models/Worker.js';
 import Site from '../models/Site.js';
+import Payment from '../models/Payment.js';
 import firebaseAuth from '../middleware/firebaseAuth.js';
 
 const router = express.Router();
@@ -67,41 +68,94 @@ router.get('/worker/:workerId', firebaseAuth, async (req, res, next) => {
     const site = await Site.findById(worker.site);
     if (!site || site.createdBy !== req.user.uid) return res.status(403).json({ error: 'Forbidden' });
 
+    // Get attendance records
     const attendances = await Attendance.find({
       worker: req.params.workerId,
       date: { $gte: from, $lte: to }
-    });
+    }).sort({ date: 1 });
 
+    // Get payment records
+    const payments = await Payment.find({
+      worker: req.params.workerId,
+      date: { $gte: from, $lte: to }
+    }).sort({ date: 1 });
+
+    // Calculate earnings from attendance
     let daysPresent = 0;
+    let daysHalf = 0;
     let totalHours = 0;
-    let totalPayout = 0;
+    let totalEarned = 0;
 
     attendances.forEach(a => {
       const hours = a.hoursWorked || 0;
+      totalHours += hours;
+      
       if (a.status === 'present') {
         daysPresent++;
         if (worker.wageType === 'hour') {
-          totalPayout += (worker.wageRate || 0) * hours;
+          totalEarned += (worker.wageRate || 0) * hours;
         } else if (worker.wageType === 'day') {
-          totalPayout += worker.wageRate || 0;
+          totalEarned += worker.wageRate || 0;
         } else if (worker.wageType === 'month') {
           const assumedWorkingDays = 26;
-          totalPayout += (worker.wageRate || 0) / assumedWorkingDays;
+          totalEarned += (worker.wageRate || 0) / assumedWorkingDays;
+        }
+      } else if (a.status === 'halfday') {
+        daysHalf++;
+        if (worker.wageType === 'hour') {
+          totalEarned += (worker.wageRate || 0) * hours * 0.5;
+        } else if (worker.wageType === 'day') {
+          totalEarned += (worker.wageRate || 0) * 0.5;
+        } else if (worker.wageType === 'month') {
+          const assumedWorkingDays = 26;
+          totalEarned += ((worker.wageRate || 0) / assumedWorkingDays) * 0.5;
         }
       }
-      totalHours += hours;
+    });
+
+    // Calculate total paid amount
+    const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const remainingAmount = Math.max(0, totalEarned - totalPaid);
+
+    // Group payments by type
+    const paymentsByType = payments.reduce((acc, payment) => {
+      if (!acc[payment.paymentType]) {
+        acc[payment.paymentType] = [];
+      }
+      acc[payment.paymentType].push(payment);
+      return acc;
+    }, {});
+
+    // Calculate totals by payment type
+    const paymentTypeTotals = {};
+    Object.keys(paymentsByType).forEach(type => {
+      paymentTypeTotals[type] = paymentsByType[type].reduce((sum, p) => sum + p.amount, 0);
     });
 
     res.json({
       workerId: worker._id,
       workerName: worker.name,
+      workerRole: worker.role,
       site: site.name,
+      siteId: site._id,
       from,
       to,
-      dailyWage: worker.wageRate,
+      wageRate: worker.wageRate,
+      wageType: worker.wageType,
       daysPresent,
+      daysHalf,
+      totalDays: daysPresent + daysHalf,
       totalHours,
-      totalPayout
+      totalEarned,
+      totalPaid,
+      remainingAmount,
+      payments: payments,
+      paymentsByType: paymentsByType,
+      paymentTypeTotals: paymentTypeTotals,
+      attendance: attendances,
+      // Legacy fields for backward compatibility
+      dailyWage: worker.wageRate,
+      totalPayout: totalEarned
     });
   } catch (err) {
     next(err);

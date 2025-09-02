@@ -4,7 +4,7 @@ import { auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaBuilding, FaUsers, FaMoneyBillWave, FaCalendarAlt, FaEye, FaTrash, FaArchive, FaUndo, FaSearch } from "react-icons/fa";
+import { FaMapMarkerAlt, FaBuilding, FaUsers, FaMoneyBillWave, FaCalendarAlt, FaEye, FaTrash, FaArchive, FaUndo, FaSearch } from "react-icons/fa";
 import { IoMdRefresh } from "react-icons/io";
 
 export default function Dashboard() {
@@ -181,7 +181,7 @@ export default function Dashboard() {
 
   return (
     <motion.div
-      className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black px-4 py-6"
+      className="min-h-screen px-4 py-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
@@ -210,38 +210,51 @@ export default function Dashboard() {
       </motion.div>
 
       {/* Quick Actions */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8"
-      >
-        <motion.button
-        
-          onClick={() => navigate("/attendance")}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
-        >
-          <FaCalendarAlt className="text-2xl" />
-          <span className="font-semibold text-base sm:text-lg">Manage Attendance</span>
-        </motion.button>
-        
-        <motion.button
-         
-          onClick={() => navigate("/payouts")}
-          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px]"
-        >
-          <FaMoneyBillWave className="text-2xl" />
-          <span className="font-semibold text-base sm:text-lg">View Payouts</span>
-        </motion.button>
-        
-        <motion.button
-         
-          onClick={fetchSites}
-          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[80px] sm:col-span-2 lg:col-span-1"
-        >
-          <IoMdRefresh  className="text-3xl" />
-          <span className="font-semibold text-base sm:text-lg">Refresh Data</span>
-        </motion.button>
-      </motion.div>
+      <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full mb-6 sm:mb-8"
+>
+  {/* Attendance */}
+  <motion.button
+    onClick={() => navigate("/attendance")}
+    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 
+      text-white px-4 sm:px-6 py-3 sm:py-5 rounded-xl shadow-lg transition-all duration-300 
+      flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[90px] w-full"
+  >
+    <FaCalendarAlt className="text-xl sm:text-2xl lg:text-3xl" />
+    <span className="font-semibold text-sm sm:text-lg lg:text-xl">
+      Manage Attendance
+    </span>
+  </motion.button>
+
+  {/* Payouts */}
+  <motion.button
+    onClick={() => navigate("/payouts")}
+    className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 
+      text-white px-4 sm:px-6 py-3 sm:py-5 rounded-xl shadow-lg transition-all duration-300 
+      flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[90px] w-full"
+  >
+    <FaMoneyBillWave className="text-xl sm:text-2xl lg:text-3xl" />
+    <span className="font-semibold text-sm sm:text-lg lg:text-xl">
+      View Payouts
+    </span>
+  </motion.button>
+
+  {/* Refresh */}
+  <motion.button
+    onClick={fetchSites}
+    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 
+      text-white px-4 sm:px-6 py-3 sm:py-5 rounded-xl shadow-lg transition-all duration-300 
+      flex items-center justify-center gap-2 sm:gap-3 min-h-[60px] sm:min-h-[90px] w-full"
+  >
+    <IoMdRefresh className="text-2xl sm:text-3xl lg:text-4xl" />
+    <span className="font-semibold text-sm sm:text-lg lg:text-xl">
+      Refresh Data
+    </span>
+  </motion.button>
+</motion.div>
+
 
       {/* Create Site + Toggle */}
       <motion.div
@@ -388,21 +401,24 @@ export default function Dashboard() {
                 scale: 1.03,
                 boxShadow: "0px 8px 30px rgba(99,102,241,0.25)",
               }}
-              className="site-card bg-white rounded-xl shadow-md p-4 sm:p-5 flex flex-col gap-3 border border-gray-200 transition min-h-[200px] sm:min-h-[220px]"
+              className="site-card bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-xl shadow-md p-4 sm:p-5 flex flex-col gap-3 transition min-h-[200px] sm:min-h-[220px]"
               layout
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
                   <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                    <FaBuilding className="text-blue-600 text-sm sm:text-base" />
+                    <FaBuilding className="text-blue-600 text-5xl" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-gray-900 text-lg sm:text-xl truncate">
+                    <div className="font-semibold text-2xl truncate">
                       {s.name}
                     </div>
-                    <div className="text-gray-500 text-sm sm:text-base truncate">
-                      {s.location || "No location"}
-                    </div>
+
+                  <div className="flex items-center text-white/90 text-lg truncate">
+                    <FaMapMarkerAlt className="mr-1 text-red-400 flex-shrink-0" />
+                    <span className="truncate">{s.location || "No location"}</span>
+                  </div>
+
                   </div>
                 </div>
                 <div
@@ -420,20 +436,20 @@ export default function Dashboard() {
               {!showArchived && siteStats[s._id] && (
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
-                      <FaUsers className="text-xs sm:text-sm" />
-                      <span className="text-xs font-medium">Workers</span>
+                    <div className="flex items-center justify-center gap-1 text-blue-600">
+                      <FaUsers className="text-3xl" />
+                      <span className="text-xl font-medium">Workers</span>
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-gray-900">
+                    <div className="text-xl font-bold text-gray-900">
                       {siteStats[s._id].totalWorkers}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 text-green-600 mb-1">
-                      <FaMoneyBillWave className="text-xs sm:text-sm" />
-                      <span className="text-xs font-medium">Remaining</span>
+                    <div className="flex items-center justify-center gap-1 text-green-600">
+                      <FaMoneyBillWave className="text-3xl" />
+                      <span className="text-xl font-medium">Remaining</span>
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-gray-900">
+                    <div className="text-xl font-bold text-gray-900">
                       ₹{siteStats[s._id].remainingAmount.toFixed(0)}
                     </div>
                   </div>
@@ -463,24 +479,22 @@ export default function Dashboard() {
                   </motion.button>
                 </div>
               ) : (
-                <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                <div className="flex flex-row gap-4 justify-center">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     onClick={() => navigate(`/site/${s._id}`)}
-                    className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                    className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px] w-full"
                   >
-                    <FaEye className="text-sm" />
-                    <span className="hidden sm:inline">Open Site</span>
-                    <span className="sm:hidden">Open</span>
+                    <FaEye className="text-3xl" />
+                    <span className="inline text-xl">Open Site</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     onClick={() => navigate('/payouts')}
-                    className="px-4 sm:px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px]"
+                    className="px-4 sm:px-5 py-3 bg-green-700 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px] w-full"
                   >
-                    <FaMoneyBillWave className="text-sm" />
-                    <span className="hidden sm:inline">Payouts</span>
-                    <span className="sm:hidden">Pay</span>
+                    <FaMoneyBillWave className="text-3xl" />
+                    <span className="inline text-xl">Payouts</span>
                   </motion.button>
                 </div>
               )}

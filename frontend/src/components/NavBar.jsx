@@ -3,7 +3,12 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { HiMenu, HiX } from "react-icons/hi";
-import { FaHome, FaCalendarAlt, FaMoneyBillWave, FaSignOutAlt } from "react-icons/fa";
+import {
+  FaHome,
+  FaCalendarAlt,
+  FaMoneyBillWave,
+  FaSignOutAlt,
+} from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
@@ -23,30 +28,29 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="backdrop-blur-md bg-gradient-to-r from-blue-600/95 to-indigo-600/95 text-white shadow-lg sticky top-0 z-50 border-b border-white/10">
-      <div className="container mx-auto flex justify-between items-center py-4 px-6">
-        {/* Logo / Branding */}
+    <nav className="backdrop-blur-md bg-gradient-to-r from-blue-600/95 to-indigo-600/95 text-white shadow-lg sticky top-0 z-50 border-b border-white/10 print:hidden">
+      <div className="container flex justify-between items-center py-3 px-6">
+        {/* LEFT: Logo + Branding */}
         <motion.div
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          className="flex items-center gap-3"
         >
-          <Link
-            to="/"
-            className="flex items-center gap-3 font-extrabold text-2xl tracking-tight"
-          >
-            <motion.span 
-              className="bg-white text-blue-600 px-3 py-2 rounded-xl shadow-lg"
-              whileHover={{ rotate: 5 }}
-            >
-              W
-            </motion.span>
-            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent text-xl sm:text-2xl">
+          <Link to="/" className="flex items-center gap-3">
+            <motion.img
+              src="/vite.svg"
+              alt="WorkHub Logo"
+              className="h-10 w-10 drop-shadow-lg rounded-2xl"
+              whileHover={{ rotate: 10, scale: 1.1 }}
+              whileTap={{ rotate: -10 }}
+            />
+            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent font-extrabold text-2xl tracking-tight">
               WorkHub
             </span>
           </Link>
         </motion.div>
 
-        {/* Desktop Menu */}
+        {/* RIGHT: Desktop Menu */}
         <div className="hidden md:flex gap-2 items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -72,7 +76,11 @@ export default function Navbar() {
                       layoutId="activeTab"
                       className="absolute inset-0 bg-white/20 rounded-lg -z-10"
                       initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30,
+                      }}
                     />
                   )}
                 </Link>
@@ -134,7 +142,9 @@ export default function Navbar() {
                       }`}
                     >
                       <Icon className="text-lg" />
-                      <span className="font-medium text-base">{item.label}</span>
+                      <span className="font-medium text-base">
+                        {item.label}
+                      </span>
                     </Link>
                   </motion.div>
                 );

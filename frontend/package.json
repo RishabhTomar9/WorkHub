@@ -17,6 +17,7 @@
     "clsx": "^1.2.1",
     "firebase": "^12.2.1",
     "gsap": "^3.13.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.542.0",
     "motion": "^12.23.12",
     "postcss": "^8.5.6",
