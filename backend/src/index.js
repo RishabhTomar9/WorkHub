@@ -28,7 +28,7 @@ const limiter = rateLimit({ windowMs: 60 * 1000, max: 120 });
 app.use(limiter);
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://workhub-three.vercel.app/'],
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://workhub-three.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
 }));
