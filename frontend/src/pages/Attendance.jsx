@@ -208,10 +208,10 @@ const AttendanceManager = () => {
 
   const getAttendanceColor = (status) => {
     switch (status) {
-      case 'present': return 'bg-green-100 border-green-300';
-      case 'halfday': return 'bg-yellow-100 border-yellow-300';
-      case 'absent': return 'bg-red-100 border-red-300';
-      default: return 'bg-gray-100 border-gray-300';
+      case 'present': return 'border-green-300';
+      case 'halfday': return 'border-yellow-300';
+      case 'absent': return 'border-red-300';
+      default: return 'border-gray-300';
     }
   };
 
@@ -257,7 +257,7 @@ const AttendanceManager = () => {
 
   if (loading && sites.length === 0) {
   return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900">
+      <div className="min-h-screen flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}

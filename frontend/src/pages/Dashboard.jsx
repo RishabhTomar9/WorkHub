@@ -330,7 +330,7 @@ export default function Dashboard() {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-5 text-red-500 hover:text-red-600 transition-colors text-3xl"
               >
                 ×
               </button>
@@ -406,15 +406,15 @@ export default function Dashboard() {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
-                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                    <FaBuilding className="text-blue-600 text-5xl" />
+                  <div className="p-3 bg-blue-100 rounded-xl flex-shrink-0">
+                    <FaBuilding className="text-blue-600 text-4xl" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-2xl truncate">
+                    <div className="font-semibold text-xl truncate">
                       {s.name}
                     </div>
 
-                  <div className="flex items-center text-white/90 text-lg truncate">
+                  <div className="flex items-center text-white/90 font-base truncate">
                     <FaMapMarkerAlt className="mr-1 text-red-400 flex-shrink-0" />
                     <span className="truncate">{s.location || "No location"}</span>
                   </div>
@@ -485,16 +485,16 @@ export default function Dashboard() {
                     onClick={() => navigate(`/site/${s._id}`)}
                     className="px-4 sm:px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px] w-full"
                   >
-                    <FaEye className="text-3xl" />
-                    <span className="inline text-xl">Open Site</span>
+                    <FaEye className="text-xl" />
+                    <span className="inline text-lg">Open Site</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     onClick={() => navigate('/payouts')}
                     className="px-4 sm:px-5 py-3 bg-green-700 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[48px] w-full"
                   >
-                    <FaMoneyBillWave className="text-3xl" />
-                    <span className="inline text-xl">Payouts</span>
+                    <FaMoneyBillWave className="text-xl" />
+                    <span className="inline text-lg">Payouts</span>
                   </motion.button>
                 </div>
               )}
