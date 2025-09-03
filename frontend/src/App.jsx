@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
+import {Analytics} from "@vercel/analytics/react";
 import { setAuthToken } from "./api/api";
 import Navbar from "./components/NavBar";
 import Login from "./pages/Login";
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/payouts" element={<Payouts />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <Analytics />
       </div>
     </>
   );
