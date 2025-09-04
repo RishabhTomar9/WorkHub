@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import SiteView from "./pages/SiteView";
 import Payouts from "./pages/Payouts";
 import Attendance from "./pages/Attendance";
+import Footer from "./components/Footer";
 // Removed unused routes: Workers and Attendance are available within SiteView
 
 
@@ -53,7 +54,7 @@ export default function App() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen px-2 bg-gradient-to-br from-black via-gray-900 to-black">
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
         <Routes>
           <Route path="/dashboard" element={<Dashboard user={user} />} />
           <Route path="/attendance" element={<Attendance />} />
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/payouts" element={<Payouts />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <Footer />
         <Analytics />
       </div>
     </>
