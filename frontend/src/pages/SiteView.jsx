@@ -54,7 +54,8 @@ export default function SiteView() {
         try {
           // Get attendance for this worker
           const attendanceRes = await api.get(`/attendance/site/${siteId}?date=${date}`);
-          const attendance = attendanceRes.data.find(a => a.worker._id === worker._id);
+          // Defensive: some attendance records may have a null worker reference (deleted/missing).
+          const attendance = attendanceRes.data.find(a => a && a.worker && a.worker._id === worker._id);
           
           let earnedAmount = 0;
           if (attendance) {
@@ -128,13 +129,17 @@ export default function SiteView() {
         address: updatedWorker.address,
       };
 
-      await api.patch(`/workers/${updatedWorker._id}`, body, { headers: { Authorization: `Bearer ${token}` } });
+  // Backend expects PUT /api/workers/:id (see server routes)
+  const idToUse = updatedWorker._id || updatedWorker.id;
+  if (!idToUse) throw new Error('Worker id missing');
+  await api.put(`/workers/${idToUse}`, body, { headers: { Authorization: `Bearer ${token}` } });
       setWorkers((prev) => prev.map((w) => (w._id === updatedWorker._id ? { ...w, ...body } : w)));
       // refresh stats for this worker
+      // refresh stats for this worker - pass the latest workers list
       fetchWorkerStats(workers);
       return true;
     } catch (err) {
-      console.error('Failed to update worker', err);
+      console.error('Failed to update worker', err?.response?.data || err?.message || err);
       // rethrow so child can show error
       throw err;
     }
@@ -166,8 +171,11 @@ export default function SiteView() {
     try {
       const r = await api.get(`/attendance/site/${siteId}`, { params: { date } });
       const map = {};
+      // Defensive: skip attendance entries with null worker
       r.data.forEach((a) => {
-        map[a.worker._id] = a;
+        if (a && a.worker && a.worker._id) {
+          map[a.worker._id] = a;
+        }
       });
       setAttendanceMap(map);
     } catch (err) {
@@ -292,80 +300,79 @@ export default function SiteView() {
           
             {/* Status Badge */}
            <div className="flex flex-row items-center justify-between gap-3">
-  {/* Status Badge */}
-  <span
-    className={`inline-flex items-center px-4 py-1.5 text-sm font-medium rounded-full shadow 
-      ${site?.deleted ? "bg-yellow-600 text-white" : "bg-green-600 text-white"}`}
-  >
-    {site?.deleted ? "Archived" : "Active"}
-  </span>
-
-  {/* 3-dot menu */}
-  <div className="relative flex items-center">
-    <button
-      className="p-2 rounded-full hover:bg-white/10 active:scale-95 transition"
-      onClick={() => setShowMenu((prev) => !prev)}
-      aria-label="Open site menu"
-    >
-      <FiMoreVertical className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-    </button>
-
-    <AnimatePresence>
-      {showMenu && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-          className="absolute right-0 mt-2 w-52 bg-gray-900 rounded-xl shadow-2xl border border-gray-700 z-50 overflow-hidden"
-        >
-          {/* Archive / Restore */}
-          {!site?.deleted ? (
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                setConfirmAction({ text: "Archive this site?", action: handleArchiveSite });
-              }}
-              className="flex items-center gap-2 w-full px-4 py-3 text-yellow-400 hover:bg-yellow-500/20 text-left"
+            {/* Status Badge */}
+            <span
+              className={`inline-flex items-center px-4 py-1.5 text-sm font-medium rounded-full shadow 
+                ${site?.deleted ? "bg-yellow-600 text-white" : "bg-green-600 text-white"}`}
             >
-              <FiArchive size={16} /> Archive Site
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                handleRestoreSite();
-              }}
-              className="flex items-center gap-2 w-full px-4 py-3 text-green-400 hover:bg-green-500/20 text-left"
-            >
-              <FiRotateCcw size={16} /> Restore Site
-            </button>
-          )}
-
-          {/* Delete */}
-          <button
-            onClick={() => {
-              setShowMenu(false);
-              setConfirmAction({ text: "Delete this site permanently?", action: handleDeleteSite });
-            }}
-            className="flex items-center gap-2 w-full px-4 py-3 text-red-400 hover:bg-red-500/20 text-left"
-          >
-            <FiTrash2 size={16} /> Delete Site
-          </button>
-
-          {/* Back */}
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2 w-full px-4 py-3 text-gray-200 hover:bg-gray-700 text-left"
-          >
-            <FiArrowLeft size={16} /> Back to Dashboard
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </div>
-</div>
-
+              {site?.deleted ? "Archived" : "Active"}
+            </span>
+          
+            {/* 3-dot menu */}
+            <div className="relative flex items-center">
+              <button
+                className="p-2 rounded-full hover:bg-white/10 active:scale-95 transition"
+                onClick={() => setShowMenu((prev) => !prev)}
+                aria-label="Open site menu"
+              >
+                <FiMoreVertical className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </button>
+          
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 mt-2 w-52 bg-gray-900 rounded-xl shadow-2xl border border-gray-700 z-50 overflow-hidden"
+                  >
+                    {/* Archive / Restore */}
+                    {!site?.deleted ? (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          setConfirmAction({ text: "Archive this site?", action: handleArchiveSite });
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-yellow-400 hover:bg-yellow-500/20 text-left"
+                      >
+                        <FiArchive size={16} /> Archive Site
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          handleRestoreSite();
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-3 text-green-400 hover:bg-green-500/20 text-left"
+                      >
+                        <FiRotateCcw size={16} /> Restore Site
+                      </button>
+                    )}
+          
+                    {/* Delete */}
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setConfirmAction({ text: "Delete this site permanently?", action: handleDeleteSite });
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-red-400 hover:bg-red-500/20 text-left"
+                    >
+                      <FiTrash2 size={16} /> Delete Site
+                    </button>
+          
+                    {/* Back */}
+                    <button
+                      onClick={() => navigate("/dashboard")}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-gray-200 hover:bg-gray-700 text-left"
+                    >
+                      <FiArrowLeft size={16} /> Back to Dashboard
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
           </div>
           
           {/* quick stats */}
@@ -373,6 +380,10 @@ export default function SiteView() {
             <div className="inline-flex items-center gap-2 bg-white/8 px-3 py-1 rounded-full text-sm text-white/90">
               <FiUsers className="w-4 h-4 text-white/90" />
               <span>{loading ? 'Loading...' : `${workers.length} worker${workers.length !== 1 ? 's' : ''}`}</span>
+            </div>
+            <div className="inline-flex items-center gap-2 bg-white/8 px-3 py-1 rounded-full text-sm text-white/90">
+              <span className="text-xs text-gray-100">Total Remaining</span>
+              <span className="font-medium">₹{Object.values(workerStats).reduce((a,c)=>a+(c?.remainingAmount||0),0).toFixed(0)}</span>
             </div>
             <div className="inline-flex items-center gap-2 text-sm text-blue-100">
               <div className="px-2 py-1 bg-white/6 rounded-full text-xs">Present: <span className="font-medium text-white/95">{loading ? '...' : presentCount}</span></div>
@@ -478,6 +489,17 @@ export default function SiteView() {
           </motion.div>
         )}
       </div>
+
+      {/* Floating Add Worker FAB for mobile */}
+      {!site?.deleted && (
+        <button
+          onClick={() => setShowAddWorker(true)}
+          className="fixed bottom-6 right-6 sm:hidden bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center z-50"
+          aria-label="Add worker"
+        >
+          <span className="text-2xl">+</span>
+        </button>
+      )}
 
       {/* Attendance Modal */}
       <AnimatePresence>

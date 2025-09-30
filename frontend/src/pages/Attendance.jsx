@@ -31,7 +31,6 @@ const AttendanceManager = () => {
   // UI States
   const [showAddWorker, setShowAddWorker] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(null);
-  const [editPayment, setEditPayment] = useState(null);
   const [newWorker, setNewWorker] = useState({ name: '', role: 'Worker', wageRate: 0, phone: '', address: '' });
   const [paymentData, setPaymentData] = useState({ amount: '', date: selectedDate, paymentType: 'wage', notes: '' });
 
@@ -184,18 +183,11 @@ const AttendanceManager = () => {
   };
 
   const getWorkerAttendance = (workerId) => {
-    return attendanceRecords.find(record => record.worker._id === workerId);
+    // Guard against attendance records where `worker` may be null
+    return attendanceRecords.find(record => record && record.worker && record.worker._id === workerId);
   };
 
-  const getWorkerPayments = async (workerId) => {
-    try {
-      const payments = await paymentService.getWorkerPayments(workerId);
-      return payments;
-    } catch (err) {
-      console.error('Error loading payments:', err);
-      return [];
-    }
-  };
+  // (removed unused getWorkerPayments helper — use `loadWorkerPayments`/workerPayments state)
 
   const getAttendanceIcon = (status) => {
     switch (status) {

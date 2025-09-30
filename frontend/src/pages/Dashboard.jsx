@@ -60,7 +60,8 @@ export default function Dashboard() {
           for (const worker of workers) {
             // Calculate earned amount based on attendance
             const attendanceRes = await api.get(`/attendance/site/${site._id}?date=${today}`);
-            const attendance = attendanceRes.data.find(a => a.worker._id === worker._id);
+            // Defensive: some attendance records may have a null worker reference
+            const attendance = attendanceRes.data.find(a => a && a.worker && a.worker._id === worker._id);
             
             if (attendance) {
               const earned = attendance.status === 'present' ? worker.wageRate : 
@@ -74,7 +75,7 @@ export default function Dashboard() {
               const payments = paymentsRes.data;
               totalPaid += payments.reduce((sum, p) => sum + p.amount, 0);
             } catch (err) {
-              console.error(`payments fetch error for worker ${worker._id}:`, err);
+              console.error(`payments fetch error for worker ${worker._id}:`, err?.response?.data || err?.message || err);
             }
           }
           
@@ -223,6 +224,27 @@ export default function Dashboard() {
             <span className="font-semibold text-indigo-300">attendance</span>
           </p>
         </div>
+        <div className="mt-4 md:mt-0 grid grid-cols-2 sm:flex sm:items-center gap-3 w-full">
+        {/* Total Sites */}
+        <div className="flex-1 text-center bg-gradient-to-br from-indigo-600/20 to-indigo-500/10 px-5 py-4 rounded-xl border border-indigo-500/20 shadow-md">
+          <div className="text-xs sm:text-sm text-gray-300">Total Sites</div>
+          <div className="text-lg sm:text-2xl font-bold text-white">
+            {sites.length}
+          </div>
+        </div>
+      
+        {/* Total Workers */}
+        <div className="flex-1 text-center bg-gradient-to-br from-indigo-600/20 to-indigo-500/10 px-5 py-4 rounded-xl border border-emerald-500/20 shadow-md">
+          <div className="text-xs sm:text-sm text-gray-300">Total Workers</div>
+          <div className="text-lg sm:text-2xl font-bold text-white">
+            {Object.values(siteStats).reduce(
+              (acc, s) => acc + (s.totalWorkers || 0),
+              0
+            )}
+          </div>
+        </div>
+      </div>
+
       </motion.div>
 
       {/* Quick Actions */}
@@ -446,6 +468,11 @@ export default function Dashboard() {
                 >
                   {showArchived ? "Archived" : "Active"}
                 </div>
+                {siteStats[s._id] && siteStats[s._id].remainingAmount > 0 && (
+                  <div className="ml-3 inline-flex items-center px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm">
+                    Recent
+                  </div>
+                )}
               </div>
 
               {/* Site Stats */}

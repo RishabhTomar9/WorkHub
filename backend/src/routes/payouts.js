@@ -24,6 +24,13 @@ router.get('/site/:siteId', firebaseAuth, async (req, res, next) => {
 
     const agg = {};
     for (const a of attendances) {
+      // Defensive: attendance entries may reference a deleted worker
+      // (a.worker can be null). Skip those records to avoid runtime errors.
+      if (!a.worker) {
+        console.warn(`Orphaned attendance record ${a._id} for site ${req.params.siteId}`);
+        continue;
+      }
+
       const wid = String(a.worker._id);
       const name = a.worker.name;
       const wageRate = a.worker.wageRate || 0;

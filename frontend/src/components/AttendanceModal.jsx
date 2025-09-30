@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import api from "../api/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes, FaSave, FaSpinner, FaCalendarAlt, FaClock, FaUser } from "react-icons/fa";
+import { FaTimes, FaSave, FaSpinner, FaCalendarAlt, FaClock, FaUser,FaCheckCircle,FaExclamationTriangle,FaTimesCircle } from "react-icons/fa";
 
 export default function AttendanceModal({ worker, siteId, date, onClose, onSaved }) {
   const [status, setStatus] = useState(worker.attendance?.status || "absent");
@@ -84,7 +84,7 @@ export default function AttendanceModal({ worker, siteId, date, onClose, onSaved
                   }`}
                 >
                   <div className="text-center">
-                    <div className="text-lg mb-1">✅</div>
+                    <FaCheckCircle className="text-2xl mb-1 text-green-100 mx-auto" />
                     <div className="text-base font-medium">Present</div>
                   </div>
                 </motion.button>
@@ -100,7 +100,7 @@ export default function AttendanceModal({ worker, siteId, date, onClose, onSaved
                   }`}
                 >
                   <div className="text-center">
-                    <div className="text-lg mb-1">⚠️</div>
+                    <FaExclamationTriangle className="text-2xl mb-1 text-yellow-200 mx-auto" />
                     <div className="text-base font-medium">Half Day</div>
                   </div>
                 </motion.button>
@@ -116,7 +116,7 @@ export default function AttendanceModal({ worker, siteId, date, onClose, onSaved
                   }`}
                 >
                   <div className="text-center">
-                    <div className="text-lg mb-1">❌</div>
+                    <FaTimesCircle className="text-2xl mb-1 text-red-200 mx-auto" />
                     <div className="text-base font-medium">Absent</div>
                   </div>
                 </motion.button>

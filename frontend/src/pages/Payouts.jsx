@@ -57,7 +57,8 @@ export default function Payouts() {
             if (from && to) {
               try {
                 const attendanceRes = await api.get(`/attendance/site/${site._id}?date=${from}`);
-                const attendance = attendanceRes.data.find(a => a.worker._id === worker._id);
+                // Defensive: some attendance records may have a null `worker` (orphaned entries)
+                const attendance = attendanceRes.data.find(a => a && a.worker && a.worker._id === worker._id);
                 
                 if (attendance) {
                   const earned = attendance.status === 'present' ? worker.wageRate : 
@@ -113,6 +114,14 @@ export default function Payouts() {
         params: { from, to },
       });
       setResults(res.data);
+      // Compute site-level totals for UI
+      if (res.data && res.data.results) {
+        const totalEarned = res.data.results.reduce((sum, w) => sum + (w.totalPayout || 0), 0);
+        // totalPaid isn't returned from this endpoint; infer from siteStats if available
+        const totalPaid = (siteStats[selectedSite] && siteStats[selectedSite].totalPaid) || 0;
+        const totalRemaining = totalEarned - totalPaid;
+        setSiteStats(prev => ({ ...prev, [selectedSite]: { ...(prev[selectedSite] || {}), totalEarned, totalPaid, remainingAmount: totalRemaining } }));
+      }
       setWorkerSlip(null); // reset single worker slip
     } catch (err) {
       setError("Failed to fetch payouts");

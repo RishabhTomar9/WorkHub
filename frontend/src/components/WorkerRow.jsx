@@ -159,40 +159,40 @@ export default function WorkerRow({
       ) : (
         <div className="flex items-center justify-between z-10">
           <div className="flex-1">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-blue-100/10 rounded-xl backdrop-blur-sm border border-blue-500/20">
-                <FaUser className="text-blue-400 w-6 h-6" />
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-white text-xl mb-1">{worker.name}</div>
-                <div className="text-base text-blue-200 mb-2">
-                  <span className="bg-blue-500/20 px-2 py-1 rounded-md mr-2">{worker.role}</span>
-                  <span className="text-green-300">₹{worker.wageRate}/day</span>
+              <div className="flex flex-row items-center gap-4 mb-4">
+                <div className="p-3 bg-blue-100/10 rounded-xl backdrop-blur-sm border border-blue-500/20 flex-shrink-0">
+                  <FaUser className="text-blue-400 w-6 h-6" />
                 </div>
-                <div className="space-y-1">
-                  {worker.phone && (
-                    <div className="text-sm text-gray-300 flex items-center gap-2">
-                      <IoCallSharp /> {worker.phone}
-                    </div>
-                  )}
-                  {worker.address && (
-                    <div className="text-sm text-gray-300 flex items-center gap-2">
-                      <FaLocationDot /> {worker.address}
-                    </div>
-                  )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-white text-lg sm:text-xl mb-1 truncate">{worker.name}</div>
+                  <div className="text-sm sm:text-base text-blue-200 mb-2 flex items-center gap-2 flex-wrap">
+                    <span className="bg-blue-500/20 px-2 py-1 rounded-md mr-2 text-xs sm:text-sm">{worker.role}</span>
+                    <span className="text-green-300 text-sm">₹{worker.wageRate}/day</span>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-300 truncate">
+                    {worker.phone && (
+                      <div className="flex items-center gap-2 truncate">
+                        <IoCallSharp /> <span className="truncate">{worker.phone}</span>
+                      </div>
+                    )}
+                    {worker.address && (
+                      <div className="flex items-center gap-2 truncate">
+                        <FaLocationDot /> <span className="truncate">{worker.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="relative self-stretch sm:self-auto">
+                  <WorkerActionsMenu
+                    worker={worker}
+                    onDelete={onRemove}
+                    onEdit={() => setEditing(true)}
+                    onViewAttendance={onOpen}
+                    isDeleting={false}
+                    isEditing={editing}
+                  />
                 </div>
               </div>
-              <div className="relative">
-                <WorkerActionsMenu
-                  worker={worker}
-                  onDelete={onRemove}
-                  onEdit={() => setEditing(true)}
-                  onViewAttendance={onOpen}
-                  isDeleting={false}
-                  isEditing={editing}
-                />
-              </div>
-            </div>
 
             {stats && (
               <motion.div 
