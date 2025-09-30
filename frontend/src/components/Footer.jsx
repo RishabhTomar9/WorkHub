@@ -1,7 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import { FaGithub, FaLinkedin, FaInstagram, FaUser, FaEnvelope } from "react-icons/fa";
-import { gsap } from "gsap";
 
 const socialLinks = [
   {
@@ -32,19 +31,11 @@ const socialLinks = [
 ];
 
 export default function Footer() {
-  const footerRef = useRef(null);
-
-  useEffect(() => {
-    gsap.fromTo(
-      footerRef.current,
-      { y: 100, opacity: 0 },
-      { y: 0, opacity: 1, duration: 1, ease: "power3.out" }
-    );
-  }, []);
-
   return (
-    <footer
-      ref={footerRef}
+    <motion.footer
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7 }}
       className="bg-white text-gray-800 py-5 rounded-t-[50%] shadow-inner border-t-15 border-black/50"
     >
       <div className="flex flex-col items-center space-y-5">
@@ -84,6 +75,6 @@ export default function Footer() {
           </div>
         </motion.div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }

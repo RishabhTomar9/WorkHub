@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import api from "../api/api";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import api, { setAuthToken } from "../api/api";
 import { auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
+  // reference motion to satisfy linters that sometimes don't detect JSX usage
+  useMemo(() => { void motion; }, []);
+
   // Filter sites based on search term
   const filteredSites = (showArchived ? archivedSites : sites).filter(site => {
     const matchesName = site.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -37,29 +40,7 @@ export default function Dashboard() {
   console.log('Search term state:', searchTerm);
   console.log('Total sites:', (showArchived ? archivedSites : sites).length);
   console.log('Filtered sites:', filteredSites.length);
-
-  useEffect(() => {
-    fetchSites();
-    const unsub = auth.onAuthStateChanged((u) => {
-      if (u) setUser(u);
-    });
-    return () => unsub();
-  }, []);
-
-  async function fetchSites() {
-    setLoading(true);
-    try {
-      const { data } = await api.get("/sites");
-      setSites(data);
-      await fetchSiteStats(data);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch sites");
-    }
-    setLoading(false);
-  }
-
-  async function fetchSiteStats(sitesData) {
+  const fetchSiteStats = useCallback(async (sitesData) => {
     try {
       const stats = {};
       for (const site of sitesData) {
@@ -93,7 +74,7 @@ export default function Dashboard() {
               const payments = paymentsRes.data;
               totalPaid += payments.reduce((sum, p) => sum + p.amount, 0);
             } catch (err) {
-              // No payments yet
+              console.error(`payments fetch error for worker ${worker._id}:`, err);
             }
           }
           
@@ -117,7 +98,42 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Error fetching site stats:', err);
     }
-  }
+  }, []);
+
+  const fetchSites = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/sites");
+      setSites(data);
+      await fetchSiteStats(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch sites");
+    }
+    setLoading(false);
+  }, [fetchSiteStats]);
+
+  useEffect(() => {
+    // Defer fetching protected resources until auth state is known.
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      if (u) {
+        setUser(u);
+        try {
+          const token = await u.getIdToken();
+          setAuthToken(token);
+        } catch (err) {
+          console.error('Failed to set auth token', err);
+        }
+      } else {
+        setUser(null);
+        setAuthToken(null);
+      }
+
+      // Fetch sites after auth is settled (will be authenticated if token set)
+      fetchSites();
+    });
+    return () => unsub();
+  }, [fetchSites]);
 
   async function fetchArchivedSites() {
     setLoading(true);

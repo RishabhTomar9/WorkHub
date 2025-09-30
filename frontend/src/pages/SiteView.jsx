@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import api from "../api/api";
-import { gsap } from "gsap";
 import { getAuth } from "firebase/auth";
 import WorkerRow from "../components/WorkerRow";
 import AttendanceModal from "../components/AttendanceModal";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreVertical, Archive, Trash2, RotateCcw, ArrowLeft } from "lucide-react";
+import { FiMoreVertical, FiArchive, FiTrash2, FiRotateCcw, FiArrowLeft, FiUsers } from "react-icons/fi";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function SiteView() {
@@ -18,59 +17,37 @@ export default function SiteView() {
   const [attendanceMap, setAttendanceMap] = useState({});
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
-  const [savingBulk, setSavingBulk] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [showAddWorker, setShowAddWorker] = useState(false);
-  const [newWorker, setNewWorker] = useState({ name: "", role: "", wageRate: 0, phone: "", address: "" });
+  const [newWorker, setNewWorker] = useState({ name: "", role: "", wageRate: "", phone: "", address: "" });
+  const [addingWorker, setAddingWorker] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [workerStats, setWorkerStats] = useState({});
+  const [query, setQuery] = useState("");
+
+  const presentCount = useMemo(() => Object.values(attendanceMap).filter(a => a.status === 'present').length, [attendanceMap]);
+  const absentCount = useMemo(() => Math.max(0, workers.length - presentCount), [workers.length, presentCount]);
+  // reference motion to satisfy some linters that don't detect JSX usage
+  useMemo(() => { void motion; }, []);
 
   // Fetch site info
-  async function fetchSite() {
+  const fetchSite = useCallback(async () => {
     try {
       const r = await api.get(`/sites/${siteId}`);
       setSite(r.data);
-    } catch (e) {
+    } catch (err) {
+      console.error('fetchSite error', err);
       toast.error("❌ Failed to fetch site");
     }
-  }
+  }, [siteId]);
 
   useEffect(() => {
     if (siteId) fetchSite();
-  }, [siteId]);
+  }, [siteId, fetchSite]);
 
-  // Fetch workers
-  useEffect(() => {
-    fetchWorkers();
-  }, [siteId]);
-
-  async function fetchWorkers() {
-    try {
-      setLoading(true);
-      const r = await api.get(`/workers/site/${siteId}`);
-      setWorkers(r.data);
-      await fetchWorkerStats(r.data);
-      setLoading(false);
-
-      // Animate rows
-      setTimeout(() => {
-        gsap.from(".worker-row", {
-          y: 12,
-          opacity: 0,
-          stagger: 0.05,
-          duration: 0.4,
-          ease: "power2.out",
-        });
-      }, 50);
-    } catch (e) {
-      setLoading(false);
-      toast.error("❌ Failed to fetch workers");
-    }
-  }
-
-  async function fetchWorkerStats(workersData) {
+  const fetchWorkerStats = useCallback(async (workersData) => {
     try {
       const stats = {};
       for (const worker of workersData) {
@@ -93,6 +70,7 @@ export default function SiteView() {
             totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
           } catch (err) {
             // No payments yet
+            console.info('payments fetch error for worker', worker._id, err?.message || err);
           }
           
           stats[worker._id] = {
@@ -100,7 +78,7 @@ export default function SiteView() {
             totalPaid,
             remainingAmount: earnedAmount - totalPaid
           };
-        } catch (err) {
+          } catch (err) {
           console.error(`Error fetching stats for worker ${worker._id}:`, err);
           stats[worker._id] = {
             earnedAmount: 0,
@@ -113,15 +91,78 @@ export default function SiteView() {
     } catch (err) {
       console.error('Error fetching worker stats:', err);
     }
+  }, [siteId, date]);
+
+  // Fetch workers
+  const fetchWorkers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const r = await api.get(`/workers/site/${siteId}`);
+      setWorkers(r.data);
+      await fetchWorkerStats(r.data);
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+      console.error('fetchWorkers error', err);
+      toast.error("❌ Failed to fetch workers");
+    }
+  }, [siteId, fetchWorkerStats]);
+
+  useEffect(() => {
+    if (siteId) fetchWorkers();
+  }, [siteId, fetchWorkers]);
+
+  // Update worker details
+  async function handleUpdateWorker(updatedWorker) {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not logged in');
+      const token = await user.getIdToken();
+
+      const body = {
+        name: updatedWorker.name,
+        role: updatedWorker.role,
+        wageRate: Number(updatedWorker.wageRate || 0),
+        phone: updatedWorker.phone,
+        address: updatedWorker.address,
+      };
+
+      await api.patch(`/workers/${updatedWorker._id}`, body, { headers: { Authorization: `Bearer ${token}` } });
+      setWorkers((prev) => prev.map((w) => (w._id === updatedWorker._id ? { ...w, ...body } : w)));
+      // refresh stats for this worker
+      fetchWorkerStats(workers);
+      return true;
+    } catch (err) {
+      console.error('Failed to update worker', err);
+      // rethrow so child can show error
+      throw err;
+    }
+  }
+
+  // Delete worker (shows confirmation modal)
+  function handleDeleteWorker(worker) {
+    setConfirmAction({
+      text: `Delete ${worker.name} permanently?`,
+      action: async () => {
+        try {
+          const auth = getAuth();
+          const user = auth.currentUser;
+          if (!user) throw new Error('Not logged in');
+          const token = await user.getIdToken();
+          await api.delete(`/workers/${worker._id}`, { headers: { Authorization: `Bearer ${token}` } });
+          setWorkers((prev) => prev.filter((w) => w._id !== worker._id));
+          toast.success('Worker deleted');
+        } catch (err) {
+          console.error('Failed to delete worker', err);
+          toast.error('❌ Failed to delete worker');
+        }
+      }
+    });
   }
 
   // Fetch attendance
-  useEffect(() => {
-    if (!workers.length) return;
-    fetchAttendance();
-  }, [date, workers]);
-
-  async function fetchAttendance() {
+  const fetchAttendance = useCallback(async () => {
     try {
       const r = await api.get(`/attendance/site/${siteId}`, { params: { date } });
       const map = {};
@@ -129,42 +170,18 @@ export default function SiteView() {
         map[a.worker._id] = a;
       });
       setAttendanceMap(map);
-    } catch (e) {
+    } catch (err) {
+      console.error('fetchAttendance error', err);
       toast.error("❌ Failed to fetch attendance");
     }
-  }
+  }, [siteId, date]);
 
-  // Bulk actions
-  function markAll(status) {
+  useEffect(() => {
     if (!workers.length) return;
-    const updated = { ...attendanceMap };
-    workers.forEach((w) => {
-      const current = updated[w._id] || { worker: w._id, status: "absent", hoursWorked: 0 };
-      updated[w._id] = { ...current, status };
-    });
-    setAttendanceMap(updated);
-  }
+    fetchAttendance();
+  }, [date, workers, fetchAttendance]);
 
-  async function saveAll() {
-    try {
-      setSavingBulk(true);
-      const records = workers.map((w) => {
-        const a = attendanceMap[w._id] || { status: "absent", hoursWorked: 0 };
-        return {
-          workerId: w._id,
-          status: a.status || "absent",
-          hoursWorked: typeof a.hoursWorked === "number" ? a.hoursWorked : 0,
-        };
-      });
-      await api.post(`/attendance/bulk`, { siteId, date, records });
-      toast.success("✅ Attendance saved for all workers");
-      fetchAttendance();
-    } catch (e) {
-      toast.error("❌ Failed to save attendance");
-    } finally {
-      setSavingBulk(false);
-    }
-  }
+  // Bulk actions (disabled for now - per-row attendance preferred)
 
   // Attendance modal
   function openAttendance(worker) {
@@ -187,6 +204,7 @@ export default function SiteView() {
     }
     
     try {
+      setAddingWorker(true);
       const auth = getAuth();
       const user = auth.currentUser;
       if (!user) throw new Error("Not logged in");
@@ -206,12 +224,14 @@ export default function SiteView() {
       );
 
       setShowAddWorker(false);
-      setNewWorker({ name: "", role: "", wageRate: 0, phone: "", address: "" });
+      setNewWorker({ name: "", role: "", wageRate: "", phone: "", address: "" });
       fetchWorkers();
       toast.success("👷 Worker added successfully!");
-    } catch (e) {
-      console.error(e.response?.data || e.message);
+    } catch (err) {
+      console.error(err?.response?.data || err?.message || err);
       toast.error("❌ Failed to add worker.");
+    } finally {
+      setAddingWorker(false);
     }
   }
 
@@ -221,7 +241,8 @@ export default function SiteView() {
       await api.delete(`/sites/${siteId}`);
       toast.success("🗑 Site deleted");
       navigate("/dashboard");
-    } catch (e) {
+    } catch (err) {
+      console.error('delete site error', err);
       toast.error("❌ Failed to delete site.");
     }
   }
@@ -230,7 +251,8 @@ export default function SiteView() {
       await api.patch(`/sites/${siteId}/archive`);
       fetchSite();
       toast("Site archived", { icon: "📦", style: { background: "#111", color: "#fff" } });
-    } catch (e) {
+    } catch (err) {
+      console.error('archive site error', err);
       toast.error("❌ Failed to archive site.");
     }
   }
@@ -239,7 +261,8 @@ export default function SiteView() {
       await api.patch(`/sites/${siteId}/restore`);
       fetchSite();
       toast("Site restored", { icon: "♻", style: { background: "#111", color: "#fff" } });
-    } catch (e) {
+    } catch (err) {
+      console.error('restore site error', err);
       toast.error("❌ Failed to restore site.");
     }
   }
@@ -250,85 +273,117 @@ export default function SiteView() {
 
       {/* Header */}
       <motion.div
-        initial={{ y: -30, opacity: 0 }}
+        initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="flex justify-between items-center mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-xl shadow-lg relative"
+        transition={{ duration: 0.45 }}
+        className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-xl shadow-lg relative gap-3"
       >
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-bold drop-shadow-md">{site?.name || "Site"}</h1>
-          <p className="text-blue-100 text-lg">{site?.location}</p>
-          {site?.deleted ? (
-            <span className="inline-block mt-2 px-3 py-1 text-sm font-medium bg-yellow-600 text-white rounded-full">
-              Archived
-            </span>
-          ) : (
-            <span className="inline-block mt-2 px-3 py-1 text-sm font-medium bg-green-600 text-white rounded-full">
-              Active
-            </span>
-          )}
-        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-row justify-between w-full">
+            {/* Title + Location */}
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold drop-shadow-md truncate">
+                {site?.name || "Site"}
+              </h1>
+              <p className="text-blue-100 text-sm sm:text-base truncate">
+                {site?.location}
+              </p>
+            </div>
+          
+            {/* Status Badge */}
+           <div className="flex flex-row items-center justify-between gap-3">
+  {/* Status Badge */}
+  <span
+    className={`inline-flex items-center px-4 py-1.5 text-sm font-medium rounded-full shadow 
+      ${site?.deleted ? "bg-yellow-600 text-white" : "bg-green-600 text-white"}`}
+  >
+    {site?.deleted ? "Archived" : "Active"}
+  </span>
 
-        {/* 3-dot menu */}
-        <div className="relative">
-          <button className="p-2 rounded-lg hover:bg-white/20 transition" onClick={() => setShowMenu((prev) => !prev)}>
-            <MoreVertical className="w-6 h-6 text-white" />
+  {/* 3-dot menu */}
+  <div className="relative flex items-center">
+    <button
+      className="p-2 rounded-full hover:bg-white/10 active:scale-95 transition"
+      onClick={() => setShowMenu((prev) => !prev)}
+      aria-label="Open site menu"
+    >
+      <FiMoreVertical className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+    </button>
+
+    <AnimatePresence>
+      {showMenu && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="absolute right-0 mt-2 w-52 bg-gray-900 rounded-xl shadow-2xl border border-gray-700 z-50 overflow-hidden"
+        >
+          {/* Archive / Restore */}
+          {!site?.deleted ? (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                setConfirmAction({ text: "Archive this site?", action: handleArchiveSite });
+              }}
+              className="flex items-center gap-2 w-full px-4 py-3 text-yellow-400 hover:bg-yellow-500/20 text-left"
+            >
+              <FiArchive size={16} /> Archive Site
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setShowMenu(false);
+                handleRestoreSite();
+              }}
+              className="flex items-center gap-2 w-full px-4 py-3 text-green-400 hover:bg-green-500/20 text-left"
+            >
+              <FiRotateCcw size={16} /> Restore Site
+            </button>
+          )}
+
+          {/* Delete */}
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setConfirmAction({ text: "Delete this site permanently?", action: handleDeleteSite });
+            }}
+            className="flex items-center gap-2 w-full px-4 py-3 text-red-400 hover:bg-red-500/20 text-left"
+          >
+            <FiTrash2 size={16} /> Delete Site
           </button>
 
-          <AnimatePresence>
-            {showMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg shadow-xl border border-gray-700 z-50 overflow-hidden"
-              >
-                {!site?.deleted ? (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      setConfirmAction({ text: "Archive this site?", action: handleArchiveSite });
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-yellow-400 hover:bg-yellow-500/20"
-                  >
-                    <Archive size={16} /> Archive Site
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      handleRestoreSite();
-                    }}
-                    className="flex items-center gap-2 w-full px-4 py-2 text-green-400 hover:bg-green-500/20"
-                  >
-                    <RotateCcw size={16} /> Restore Site
-                  </button>
-                )}
+          {/* Back */}
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 w-full px-4 py-3 text-gray-200 hover:bg-gray-700 text-left"
+          >
+            <FiArrowLeft size={16} /> Back to Dashboard
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+</div>
 
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    setConfirmAction({ text: "Delete this site permanently?", action: handleDeleteSite });
-                  }}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-red-400 hover:bg-red-500/20"
-                >
-                  <Trash2 size={16} /> Delete Site
-                </button>
-
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-gray-200 hover:bg-gray-700"
-                >
-                  <ArrowLeft size={16} /> Back to Dashboard
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          </div>
+          
+          {/* quick stats */}
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-2 bg-white/8 px-3 py-1 rounded-full text-sm text-white/90">
+              <FiUsers className="w-4 h-4 text-white/90" />
+              <span>{loading ? 'Loading...' : `${workers.length} worker${workers.length !== 1 ? 's' : ''}`}</span>
+            </div>
+            <div className="inline-flex items-center gap-2 text-sm text-blue-100">
+              <div className="px-2 py-1 bg-white/6 rounded-full text-xs">Present: <span className="font-medium text-white/95">{loading ? '...' : presentCount}</span></div>
+              <div className="px-2 py-1 bg-white/6 rounded-full text-xs">Absent: <span className="font-medium text-white/95">{loading ? '...' : absentCount}</span></div>
+            </div>
+            <div className="text-sm text-blue-100">Date: <span className="font-medium">{date}</span></div>
+          </div>
         </div>
       </motion.div>
 
-      {/* Date Picker */}
+      {/* Date Picker + Search */}
       <div className="bg-gray-800/60 rounded-xl shadow-lg p-4 mb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex-1">
@@ -340,39 +395,47 @@ export default function SiteView() {
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-{/*           
-          <div className="flex gap-2">
-            <button
-              className="px-4 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-base font-medium"
-              onClick={() => markAll("present")}
-            >
-              Mark All Present
-            </button>
-            <button
-              className="px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-base font-medium"
-              onClick={() => markAll("absent")}
-            >
-              Mark All Absent
-            </button>
-            <button
-              className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-base font-medium disabled:opacity-60"
-              onClick={saveAll}
-              disabled={savingBulk || !workers.length}
-            >
-              {savingBulk ? "Saving..." : "Save All"}
-            </button>
-          </div> */}
+          <div className="sm:ml-4 sm:w-1/3">
+            <label className="text-base font-medium text-gray-300 block mb-2">Search workers</label>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, role or phone"
+              className="w-full px-4 py-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base"
+            />
+          </div>
         </div>
       </div>
 
       {/* Workers Section */}
       <div className="bg-gray-800/70 rounded-xl shadow-lg p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-bold text-xl">👷 Workers</h2>
+        <div className="flex flex-row justify-between items-center flex-wrap gap-4 mb-6">
+          {/* Left side - Title & Results */}
+          <div>
+            <h2 className="font-bold text-2xl sm:text-3xl text-white flex items-center gap-2">
+              👷 Workers
+            </h2>
+            <p className="text-gray-400 text-sm sm:text-base mt-1">
+              Showing{" "}
+              <span className="font-semibold text-white">
+                {
+                  workers.filter((w) =>
+                    `${w.name} ${w.role} ${w.phone}`
+                      .toLowerCase()
+                      .includes(query.toLowerCase())
+                  ).length
+                }
+              </span>{" "}
+              results
+            </p>
+          </div>
+        
+          {/* Right side - Add Worker button */}
           {!site?.deleted && (
             <button
-              className="px-4 py-2 rounded-lg text-base font-medium bg-blue-600 hover:bg-blue-700 transition text-white"
               onClick={() => setShowAddWorker(true)}
+              className="flex items-center justify-center px-5 py-2.5 rounded-lg text-base font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 text-white"
             >
               + Add Worker
             </button>
@@ -380,21 +443,39 @@ export default function SiteView() {
         </div>
 
         {loading ? (
-          <p className="text-gray-400 italic text-base">Loading workers...</p>
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="animate-pulse bg-white/5 rounded-lg p-4 h-28 flex items-start gap-4">
+                <div className="w-12 h-12 bg-white/10 rounded-lg"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-white/10 rounded w-1/3 mb-2"></div>
+                  <div className="h-3 bg-white/6 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-white/6 rounded w-1/4"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : workers.length === 0 ? (
           <p className="text-gray-400 italic text-base">No workers yet. Add one to get started.</p>
         ) : (
-          workers.map((w) => {
-            const attendance = attendanceMap[w._id] || { status: "absent" };
-            return (
-              <WorkerRow 
-                key={w._id} 
-                worker={{ ...w, attendance }} 
-                onOpen={() => openAttendance(w)}
-                stats={workerStats[w._id]}
-              />
-            );
-          })
+          <motion.div initial="hidden" animate="show" className="space-y-4"
+            variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.04 } } }}
+          >
+            {workers.filter(w => `${w.name} ${w.role} ${w.phone}`.toLowerCase().includes(query.toLowerCase())).map((w) => {
+              const attendance = attendanceMap[w._id] || { status: "absent" };
+              return (
+                <motion.div key={w._id} variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
+                  <WorkerRow 
+                    worker={{ ...w, attendance }} 
+                    onOpen={() => openAttendance(w)}
+                    onUpdate={handleUpdateWorker}
+                    onRemove={handleDeleteWorker}
+                    stats={workerStats[w._id]}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
       </div>
 
@@ -417,12 +498,15 @@ export default function SiteView() {
                   onChange={(e) => setNewWorker({ ...newWorker, name: e.target.value })}
                   required
                 />
-                <input
+                <select
                   className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 text-base"
-                  placeholder="Role"
                   value={newWorker.role}
                   onChange={(e) => setNewWorker({ ...newWorker, role: e.target.value })}
-                />
+                >
+                  <option value="">Role</option>
+                  <option value="Labour (मज़दूर)">Labour (मज़दूर)</option>
+                  <option value="Mistri (मिस्त्री)">Mistri (मिस्त्री)</option>
+                </select>
                 <input
                   type="number"
                   className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 text-base"
@@ -456,8 +540,15 @@ export default function SiteView() {
                   <button type="button" onClick={() => setShowAddWorker(false)} className="px-4 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-base font-medium">
                     Cancel
                   </button>
-                  <button type="submit" className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-base">
-                    Save
+                  <button type="submit" disabled={addingWorker} className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-base disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 justify-center">
+                    {addingWorker ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save'
+                    )}
                   </button>
                 </div>
               </form>
