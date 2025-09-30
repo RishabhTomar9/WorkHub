@@ -174,3 +174,45 @@ d:\Work Hub\frontend
 *   **`src/components`**: This directory stores reusable React components that are used to build the user interface.
 *   **`src/pages`**: This folder contains the main page components of the application, which are rendered based on the current route.
 *   **`src/utils`**: This directory holds utility functions and helper modules for the frontend, such as payout calculations.
+
+
+
+---
+
+## ⚙️ Environment Setup
+
+### Frontend & Backend — `.env`
+```env
+
+# --------------------------
+# Frontend Environment Config
+# --------------------------
+
+# Firebase client config (from Firebase Console)
+VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=YOUR_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID=YOUR_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET=YOUR_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID=YOUR_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
+
+# --------------------------
+# Backend Environment Config
+# --------------------------
+
+# Server
+PORT=4000
+
+# Database (MongoDB Atlas or local instance)
+MONGO_URI=your_mongodb_connection_string
+
+# Firebase Admin SDK
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_CLIENT_EMAIL=your_service_account_client_email
+
+# Replace YOUR_PRIVATE_KEY_CONTENTS with the contents of your private key
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_CONTENTS\n-----END PRIVATE KEY-----\n"
+
+
+# API base URL (backend server URL)
+VITE_API_URL=https://your-backend.example.com
