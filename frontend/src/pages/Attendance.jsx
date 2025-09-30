@@ -275,96 +275,79 @@ const AttendanceManager = () => {
           <p className="text-blue-200 text-lg sm:text-xl">Manage worker attendance and payments</p>
         </motion.div>
 
-                 {/* Controls */}
-         <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.1 }}
-           className="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 mb-6 border border-white/20"
-         >
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                        {/* Site Selection */}
-            <div>
-              <label className="block text-white font-medium mb-2 text-base sm:text-lg">Select Site</label>
-              <select
-                value={selectedSite?._id || ''}
-                onChange={(e) => setSelectedSite(sites.find(s => s._id === e.target.value))}
-                className="w-full p-4 rounded-lg bg-white/20 border border-white/30 text-white focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px]"
-              >
-                {sites.map(site => (
-                  <option key={site._id} value={site._id} className="bg-gray-800">
-                    {site.name}
-                  </option>
-                ))}
-              </select>
-      </div>
-
-            {/* Search Bar */}
-            <div>
-              <label className="block text-white font-medium mb-2 text-base sm:text-lg">
-                Search Workers
-                {searchTerm && (
-                  <span className="text-sm text-blue-300 ml-2">
-                    ({filteredWorkers.length} of {workers.length})
-                  </span>
-                )}
-              </label>
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-300 text-sm sm:text-base" />
-                <input
-                  type="text"
-                  placeholder="Search by name, role, or phone..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    console.log('Search input changed:', e.target.value);
-                    setSearchTerm(e.target.value);
-                  }}
-                  className="w-full pl-10 pr-10 p-4 rounded-lg bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px]"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Date Selection */}
-            <div>
-              <label className="block text-white font-medium mb-2 text-base sm:text-lg">Select Date</label>
-              <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-300 text-sm sm:text-base" />
-        <input
-          type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full pl-10 pr-4 p-4 rounded-lg bg-white/20 border border-white/30 text-white focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px]"
-        />
-      </div>
-            </div>
-
-            {/* Add Worker Button */}
-            <div className="sm:col-span-2 lg:col-span-1 flex items-end">
-              <motion.button
-                whileHover={selectedSite ? { scale: 1.05 } : {}}
-                onClick={() => selectedSite && setShowAddWorker(true)}
-                disabled={!selectedSite}
-                className={`w-full px-4 py-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-base sm:text-lg min-h-[52px] ${
-                  selectedSite 
-                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' 
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                <FaUserPlus className="text-sm sm:text-base" />
-                <span className="hidden sm:inline">Add Worker</span>
-                <span className="sm:hidden">Add</span>
-              </motion.button>
+      {/* Controls */}
+       <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-lg rounded-2xl p-4 sm:p-6 mb-6 border border-white/20 shadow-lg"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Site Selection */}
+          <div className="flex flex-col">
+            <label className="block text-white font-semibold mb-2 text-base sm:text-lg">
+              Select Site
+            </label>
+            <select
+              value={selectedSite?._id || ''}
+              onChange={(e) => setSelectedSite(sites.find(s => s._id === e.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px] transition-all hover:bg-white/25"
+            >
+              {sites.map(site => (
+                <option key={site._id} value={site._id} className="bg-gray-800 text-white">
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          </div>
+      
+          {/* Search Bar */}
+          <div className="flex flex-col">
+            <label className="block text-white font-semibold mb-2 text-base sm:text-lg">
+              Search Workers
+              {searchTerm && (
+                <span className="text-sm text-blue-300 ml-2">
+                  ({filteredWorkers.length} of {workers.length})
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 text-sm sm:text-base" />
+              <input
+                type="text"
+                placeholder="Search by name, role, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-10 p-4 rounded-xl bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px] transition-all hover:bg-white/25"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                >
+                  ×
+                </button>
+              )}
             </div>
           </div>
-        </motion.div>
+      
+          {/* Date Selection */}
+          <div className="flex flex-col">
+            <label className="block text-white font-semibold mb-2 text-base sm:text-lg">
+              Select Date
+            </label>
+            <div className="relative">
+              <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 text-sm sm:text-base" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full pl-10 pr-4 p-4 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-base sm:text-lg min-h-[52px] transition-all hover:bg-white/25"
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
         {/* Error Display */}
         <AnimatePresence>
