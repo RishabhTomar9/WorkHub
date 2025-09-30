@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import api from "../api/api";
 import { setAuthToken } from "../api/api";
 import { auth } from "../firebase";
@@ -17,13 +17,75 @@ export default function Payouts() {
   const [error, setError] = useState(null);
   const [siteStats, setSiteStats] = useState({});
 
+  // Compute stats for sites (stable identity via useCallback)
+  const fetchSiteStats = useCallback(async (sitesData) => {
+    try {
+      const stats = {};
+      for (const site of sitesData) {
+        try {
+          const workersRes = await api.get(`/workers/site/${site._id}`);
+          const workers = workersRes.data;
+          
+          let totalEarned = 0;
+          let totalPaid = 0;
+          
+          for (const worker of workers) {
+            // Get attendance for the date range
+            if (from && to) {
+              try {
+                const attendanceRes = await api.get(`/attendance/site/${site._id}?date=${from}`);
+                // Defensive: some attendance records may have a null `worker` (orphaned entries)
+                const attendance = attendanceRes.data.find(a => a && a.worker && a.worker._id === worker._id);
+                
+                if (attendance) {
+                  const earned = attendance.status === 'present' ? worker.wageRate : 
+                               attendance.status === 'halfday' ? worker.wageRate / 2 : 0;
+                  totalEarned += earned;
+                }
+              } catch (err) {
+                console.debug('attendance fetch error', err);
+              }
+            }
+            
+            // Get payments for this worker
+            try {
+              const paymentsRes = await api.get(`/payments/worker/${worker._id}?startDate=${from}&endDate=${to}`);
+              const payments = paymentsRes.data;
+              totalPaid += payments.reduce((sum, p) => sum + p.amount, 0);
+            } catch (err) {
+              console.debug('payments fetch error', err);
+            }
+          }
+          
+          stats[site._id] = {
+            totalWorkers: workers.length,
+            totalEarned,
+            totalPaid,
+            remainingAmount: totalEarned - totalPaid
+          };
+        } catch (err) {
+          console.error(`Error fetching stats for site ${site._id}:`, err);
+          stats[site._id] = {
+            totalWorkers: 0,
+            totalEarned: 0,
+            totalPaid: 0,
+            remainingAmount: 0
+          };
+        }
+      }
+      setSiteStats(stats);
+    } catch (err) {
+      console.error('Error fetching site stats:', err);
+    }
+  }, [from, to]);
+
   // Set default date range to current month
   useEffect(() => {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     setFrom(firstDay.toISOString().slice(0, 10));
     setTo(today.toISOString().slice(0, 10));
-  }, []);
+  }, [fetchSiteStats]);
   useEffect(() => {
     let mounted = true;
 
@@ -60,68 +122,9 @@ export default function Payouts() {
     loadSites();
 
     return () => { mounted = false; window.removeEventListener('workhub:sites', onCachedSites); };
-  }, []);
+  }, [fetchSiteStats]);
 
-  const fetchSiteStats = async (sitesData) => {
-    try {
-      const stats = {};
-      for (const site of sitesData) {
-        try {
-          const workersRes = await api.get(`/workers/site/${site._id}`);
-          const workers = workersRes.data;
-          
-          let totalEarned = 0;
-          let totalPaid = 0;
-          
-          for (const worker of workers) {
-            // Get attendance for the date range
-            if (from && to) {
-              try {
-                const attendanceRes = await api.get(`/attendance/site/${site._id}?date=${from}`);
-                // Defensive: some attendance records may have a null `worker` (orphaned entries)
-                const attendance = attendanceRes.data.find(a => a && a.worker && a.worker._id === worker._id);
-                
-                if (attendance) {
-                  const earned = attendance.status === 'present' ? worker.wageRate : 
-                               attendance.status === 'halfday' ? worker.wageRate / 2 : 0;
-                  totalEarned += earned;
-                }
-              } catch (err) {
-                // No attendance data
-              }
-            }
-            
-            // Get payments for this worker
-            try {
-              const paymentsRes = await api.get(`/payments/worker/${worker._id}?startDate=${from}&endDate=${to}`);
-              const payments = paymentsRes.data;
-              totalPaid += payments.reduce((sum, p) => sum + p.amount, 0);
-            } catch (err) {
-              // No payments yet
-            }
-          }
-          
-          stats[site._id] = {
-            totalWorkers: workers.length,
-            totalEarned,
-            totalPaid,
-            remainingAmount: totalEarned - totalPaid
-          };
-        } catch (err) {
-          console.error(`Error fetching stats for site ${site._id}:`, err);
-          stats[site._id] = {
-            totalWorkers: 0,
-            totalEarned: 0,
-            totalPaid: 0,
-            remainingAmount: 0
-          };
-        }
-      }
-      setSiteStats(stats);
-    } catch (err) {
-      console.error('Error fetching site stats:', err);
-    }
-  };
+  
 
   const fetchSitePayouts = async () => {
     if (!selectedSite || !from || !to) {
@@ -197,8 +200,8 @@ export default function Payouts() {
     
     if (slip.payments && slip.payments.length > 0) {
       message += `💳 *Payment Details:*\n`;
-      slip.payments.forEach((payment, index) => {
-        message += `${index + 1}. ${formatDate(payment.date)} - ${formatCurrency(payment.amount)} (${payment.paymentType})\n`;
+      slip.payments.forEach((payment) => {
+        message += `• ${formatDate(payment.date)} - ${formatCurrency(payment.amount)} (${payment.paymentType})\n`;
         if (payment.notes) {
           message += `   Note: ${payment.notes}\n`;
         }
@@ -212,7 +215,7 @@ export default function Payouts() {
     return encodeURIComponent(message);
   };
 
-  const captureSalarySlipImage = async (slipElement) => {
+  const captureSalarySlipImage = async () => {
     try {
       // Create a simplified version of the salary slip for image capture
       const simplifiedElement = document.createElement('div');
@@ -271,7 +274,7 @@ export default function Payouts() {
         <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
           <h3 style="color: white; margin: 0 0 15px 0; font-size: 18px;">Payment History</h3>
           <div style="max-height: 200px; overflow-y: auto;">
-            ${slip.payments.map((payment, index) => `
+            ${slip.payments.map((payment) => `
               <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="color: white; font-weight: bold;">${formatCurrency(payment.amount)}</span>
@@ -454,7 +457,7 @@ export default function Payouts() {
         ${slip.payments && slip.payments.length > 0 ? `
         <div class="payment-history">
           <h3>Payment History</h3>
-          ${slip.payments.map((payment, index) => `
+          ${slip.payments.map((payment) => `
             <div class="payment-entry">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong>${formatCurrency(payment.amount)}</strong>

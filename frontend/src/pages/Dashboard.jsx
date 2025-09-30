@@ -131,9 +131,11 @@ export default function Dashboard() {
       }
 
       // Fetch sites after auth is settled (will be authenticated if token set)
+      // Ensure fetchSites has stable identity via useCallback
       fetchSites();
     });
     return () => unsub();
+    // fetchSites is stable because it's wrapped in useCallback with fetchSiteStats dep
   }, [fetchSites]);
 
   async function fetchArchivedSites() {
