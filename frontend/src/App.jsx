@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import {Analytics} from "@vercel/analytics/react";
 import { setAuthToken } from "./api/api";
+import cache from './utils/cache';
 import Navbar from "./components/NavBar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -45,6 +46,17 @@ export default function App() {
       setCheckingAuth(false);
     });
     return unsub;
+  }, []);
+
+  // Prefetch commonly used data (sites) from cache to speed up initial render.
+  useEffect(() => {
+    (async () => {
+      const cachedSites = cache.getCached('sites');
+      if (cachedSites) {
+        // Provide cached sites to the app via a custom event so pages can consume them
+        window.dispatchEvent(new CustomEvent('workhub:sites', { detail: cachedSites }));
+      }
+    })();
   }, []);
 
   if (checkingAuth) return <Loader />;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import api from "../api/api";
+import cache from '../utils/cache';
 import { getAuth } from "firebase/auth";
 import WorkerRow from "../components/WorkerRow";
 import AttendanceModal from "../components/AttendanceModal";
@@ -35,8 +36,14 @@ export default function SiteView() {
   // Fetch site info
   const fetchSite = useCallback(async () => {
     try {
+      // Try cache first
+      const cacheKey = `site:${siteId}`;
+      const cached = cache.getCached(cacheKey);
+      if (cached) setSite(cached);
+
       const r = await api.get(`/sites/${siteId}`);
       setSite(r.data);
+      cache.setCached(cacheKey, r.data, 1000 * 60 * 10); // 10 minutes
     } catch (err) {
       console.error('fetchSite error', err);
       toast.error("❌ Failed to fetch site");
@@ -66,8 +73,16 @@ export default function SiteView() {
           // Get payments for this worker
           let totalPaid = 0;
           try {
-            const paymentsRes = await api.get(`/payments/worker/${worker._id}`);
-            const payments = paymentsRes.data;
+            const paymentsKey = `payments:worker:${worker._id}`;
+            const cachedPayments = cache.getCached(paymentsKey);
+            let payments;
+            if (cachedPayments) {
+              payments = cachedPayments;
+            } else {
+              const paymentsRes = await api.get(`/payments/worker/${worker._id}`);
+              payments = paymentsRes.data;
+              cache.setCached(paymentsKey, payments, 1000 * 60 * 10);
+            }
             totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
           } catch (err) {
             // No payments yet
@@ -98,8 +113,13 @@ export default function SiteView() {
   const fetchWorkers = useCallback(async () => {
     try {
       setLoading(true);
+      const workersKey = `workers:site:${siteId}`;
+      const cached = cache.getCached(workersKey);
+      if (cached) setWorkers(cached);
+
       const r = await api.get(`/workers/site/${siteId}`);
       setWorkers(r.data);
+      cache.setCached(workersKey, r.data, 1000 * 60 * 10);
       await fetchWorkerStats(r.data);
       setLoading(false);
     } catch (err) {
@@ -134,9 +154,10 @@ export default function SiteView() {
   if (!idToUse) throw new Error('Worker id missing');
   await api.put(`/workers/${idToUse}`, body, { headers: { Authorization: `Bearer ${token}` } });
       setWorkers((prev) => prev.map((w) => (w._id === updatedWorker._id ? { ...w, ...body } : w)));
-      // refresh stats for this worker
-      // refresh stats for this worker - pass the latest workers list
-      fetchWorkerStats(workers);
+  // Invalidate workers cache so other pages fetch fresh data
+  try { cache.clearCache(`workers:site:${siteId}`); } catch (e) { console.debug('cache clear failed', e); }
+  // refresh stats for this worker - pass the latest workers list
+  fetchWorkerStats(workers);
       return true;
     } catch (err) {
       console.error('Failed to update worker', err?.response?.data || err?.message || err);
@@ -157,6 +178,9 @@ export default function SiteView() {
           const token = await user.getIdToken();
           await api.delete(`/workers/${worker._id}`, { headers: { Authorization: `Bearer ${token}` } });
           setWorkers((prev) => prev.filter((w) => w._id !== worker._id));
+          // Invalidate workers list cache and today's attendance for this site
+          try { cache.clearCache(`workers:site:${siteId}`); } catch (e) { console.debug('cache clear failed', e); }
+          try { cache.clearCache(`attendance:site:${siteId}:date:${date}`); } catch (e) { console.debug('cache clear failed', e); }
           toast.success('Worker deleted');
         } catch (err) {
           console.error('Failed to delete worker', err);
@@ -169,6 +193,12 @@ export default function SiteView() {
   // Fetch attendance
   const fetchAttendance = useCallback(async () => {
     try {
+      const attendanceKey = `attendance:site:${siteId}:date:${date}`;
+      const cached = cache.getCached(attendanceKey);
+      if (cached) {
+        setAttendanceMap(cached.reduce((m, a) => { if (a && a.worker && a.worker._id) m[a.worker._id] = a; return m; }, {}));
+      }
+
       const r = await api.get(`/attendance/site/${siteId}`, { params: { date } });
       const map = {};
       // Defensive: skip attendance entries with null worker
@@ -178,6 +208,7 @@ export default function SiteView() {
         }
       });
       setAttendanceMap(map);
+      cache.setCached(attendanceKey, r.data, 1000 * 60 * 5);
     } catch (err) {
       console.error('fetchAttendance error', err);
       toast.error("❌ Failed to fetch attendance");
@@ -233,7 +264,11 @@ export default function SiteView() {
 
       setShowAddWorker(false);
       setNewWorker({ name: "", role: "", wageRate: "", phone: "", address: "" });
-      fetchWorkers();
+  // clear workers cache so fetchWorkers gets fresh data
+  try { cache.clearCache(`workers:site:${siteId}`); } catch (e) { console.debug('cache clear failed', e); }
+  // clear today's attendance too; adding a worker shouldn't affect past records but makes UI consistent
+  try { cache.clearCache(`attendance:site:${siteId}:date:${date}`); } catch (e) { console.debug('cache clear failed', e); }
+  fetchWorkers();
       toast.success("👷 Worker added successfully!");
     } catch (err) {
       console.error(err?.response?.data || err?.message || err);

@@ -24,21 +24,42 @@ export default function Payouts() {
     setFrom(firstDay.toISOString().slice(0, 10));
     setTo(today.toISOString().slice(0, 10));
   }, []);
-
   useEffect(() => {
-    const fetchSites = async () => {
+    let mounted = true;
+
+    const loadSites = async () => {
       try {
-      const token = await auth.currentUser.getIdToken();
-      setAuthToken(token);
-      const res = await api.get("/sites");
-      setSites(res.data);
+        // Try cache first (fast)
+        const cache = await import('../utils/cache');
+        const cached = cache.getCached('sites');
+        if (cached && mounted) {
+          setSites(cached);
+          // still refresh in background
+        }
+
+        // Ensure token and fetch fresh sites
+        const token = await auth.currentUser.getIdToken();
+        setAuthToken(token);
+        const res = await api.get("/sites");
+        if (mounted) setSites(res.data);
+        // store fresh data in cache for next load
+        cache.setCached('sites', res.data, 1000 * 60 * 10); // 10m
         await fetchSiteStats(res.data);
       } catch (err) {
         setError("Failed to fetch sites");
         console.error(err);
       }
     };
-    fetchSites();
+
+    // fast path: listen for App-level cached sites event
+    function onCachedSites(e) {
+      if (e?.detail) setSites(e.detail);
+    }
+    window.addEventListener('workhub:sites', onCachedSites);
+
+    loadSites();
+
+    return () => { mounted = false; window.removeEventListener('workhub:sites', onCachedSites); };
   }, []);
 
   const fetchSiteStats = async (sitesData) => {
